@@ -8,7 +8,7 @@ from typing import cast
 import pytest
 from pytest import MonkeyPatch
 
-from maida_heal.cli import _prompt_credentials
+from maida_heal.cli import _resolve_and_bridge_credentials
 from maida_heal.discovery import discover_streams
 from maida_heal.langfuse import (
     HTTPClient,
@@ -120,7 +120,7 @@ def test_file_credentials_are_bridged_only_to_the_import_child_environment(
         encoding="utf-8",
     )
 
-    selected = _prompt_credentials(tmp_path)
+    selected = _resolve_and_bridge_credentials(tmp_path)
 
     assert selected.source == "config"
     assert os.environ["LANGFUSE_PUBLIC_KEY"] == "pk-file"

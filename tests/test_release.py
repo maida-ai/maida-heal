@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 from pytest import MonkeyPatch
 
 from maida_heal.models import (
+    ActivationConfig,
     Actor,
     AutoMergeConfig,
     Finding,
@@ -20,8 +21,10 @@ from maida_heal.models import (
     HealConfig,
     HistoryEvent,
     LangfuseConfig,
+    LoopMode,
     MergeRecord,
     MetricFailure,
+    StreamConfig,
 )
 from maida_heal.release import (
     GitHubReleaser,
@@ -94,6 +97,7 @@ def configured(
     (repo / ".git").mkdir(parents=True)
     state = StateStore(tmp_path / "control")
     config = HealConfig(
+        mode=LoopMode.VERIFY if with_gate else LoopMode.PROPOSE,
         langfuse=LangfuseConfig(
             host="https://example.test", credential_source="environment"
         ),
@@ -125,7 +129,16 @@ def configured(
     return state, config
 
 
-def test_auto_merge_enable_requires_gate_and_a_watched_human_merge(
+def authorize_full(config: HealConfig) -> None:
+    config.activation = ActivationConfig(
+        acknowledged_by="Operator <operator@example.test>",
+        date=date(2026, 8, 11),
+        statement="autonomous-fix-loop-authorized",
+    )
+    config.mode = LoopMode.FULL
+
+
+def test_auto_merge_enable_requires_gate_and_full_mode_attestation(
     tmp_path: Path,
 ) -> None:
     state, no_gate = configured(tmp_path / "one", with_gate=False)
@@ -133,18 +146,11 @@ def test_auto_merge_enable_requires_gate_and_a_watched_human_merge(
         enable_auto_merge(state, no_gate, now=NOW)
 
     state, config = configured(tmp_path / "two")
-    closed = finding("mh-20260811-0123456789")
-    state.save_finding(closed, config)
-    with pytest.raises(ValueError, match="human merged"):
+    with pytest.raises(StateError, match="activation attestation"):
         enable_auto_merge(state, config, now=NOW)
 
-    closed.merge = MergeRecord(
-        mode="human",
-        merged_at=NOW - timedelta(hours=1),
-        commit="abcdef1234567890",
-        pull_request_number=17,
-    )
-    state.save_finding(closed, config)
+    authorize_full(config)
+    state.save_config(config)
     enabled = enable_auto_merge(
         state,
         config,
@@ -152,7 +158,7 @@ def test_auto_merge_enable_requires_gate_and_a_watched_human_merge(
         max_diff_lines=120,
         daily_budget=2,
     )
-    assert enabled.tier == 4
+    assert enabled.mode is LoopMode.FULL
     assert enabled.auto_merge and enabled.auto_merge.max_diff_lines == 120
 
 
@@ -210,7 +216,9 @@ def test_auto_merge_degrades_to_review_outside_limits(
     assert item.merge is None
 
 
-def test_auto_merge_honors_kill_switch_and_delivery_failure(tmp_path: Path) -> None:
+def test_auto_merge_honors_kill_switch_and_delivery_failure(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     item = finding("mh-20260811-0123456789")
     lock = tmp_path / ".maida-heal" / "heal.lock"
     lock.parent.mkdir()
@@ -224,6 +232,16 @@ def test_auto_merge_honors_kill_switch_and_delivery_failure(tmp_path: Path) -> N
     )
     assert paused.reason == "kill switch is active"
     lock.unlink()
+    monkeypatch.setenv("MAIDA_HEAL_PAUSED", "fix_dispatch")
+    scoped = maybe_auto_merge(
+        tmp_path,
+        item,
+        AutoMergeConfig(),
+        now=NOW,
+        releaser=FakeReleaser(),
+    )
+    assert scoped.reason == "kill switch is active"
+    monkeypatch.delenv("MAIDA_HEAL_PAUSED")
     failed = maybe_auto_merge(
         tmp_path,
         item,
@@ -248,6 +266,17 @@ def test_auto_merge_records_the_merge_inside_every_bound(tmp_path: Path) -> None
     assert decision.merged is True
     assert releaser.merged == [17]
     assert item.merge and item.merge.mode == "automatic"
+
+    repeated = maybe_auto_merge(
+        tmp_path,
+        item,
+        AutoMergeConfig(),
+        now=NOW,
+        releaser=releaser,
+    )
+    assert repeated.merged is False
+    assert repeated.reason == "merge is already recorded"
+    assert releaser.merged == [17]
 
 
 @pytest.mark.parametrize(
@@ -315,15 +344,17 @@ class FakeRollbackPublisher:
         return "https://github.com/maida-ai/example/pull/99"
 
 
-def test_recurrence_opens_a_never_automatic_revert_and_pauses(tmp_path: Path) -> None:
+def test_handoff_recurrence_opens_revert_event_and_pauses_fix_dispatch(
+    tmp_path: Path,
+) -> None:
     state, config = configured(tmp_path)
-    config.auto_merge = AutoMergeConfig(enabled_at=NOW - timedelta(hours=2))
+    authorize_full(config)
     state.save_config(config)
     prior = finding(
         "mh-20260810-0123456789",
         detected_at=NOW - timedelta(hours=3),
         merge=MergeRecord(
-            mode="automatic",
+            mode="human",
             merged_at=NOW - timedelta(hours=2),
             commit="deadbee123456789",
             pull_request_number=16,
@@ -338,6 +369,7 @@ def test_recurrence_opens_a_never_automatic_revert_and_pauses(tmp_path: Path) ->
     state.save_finding(prior, config)
     state.save_finding(current, config)
     publisher = FakeRollbackPublisher()
+    pause_syncs: list[str] = []
 
     decision = handle_recurrence(
         state,
@@ -345,18 +377,92 @@ def test_recurrence_opens_a_never_automatic_revert_and_pauses(tmp_path: Path) ->
         current,
         now=NOW,
         publisher=publisher,
+        pause_sync=lambda _config: pause_syncs.append("fix_dispatch"),
     )
 
     assert decision.opened is True
     assert publisher.calls == ["deadbee123456789"]
     assert state.lock_path.is_file()
+    lock = state.lock_path.read_text()
+    assert '"scope": "fix_dispatch"' in lock
     assert config.fixes is not None
-    assert (Path(config.fixes.repo_local_path) / ".maida" / "heal.lock").is_file()
+    assert (config.fixes.local_repo() / ".maida" / "heal.lock").is_file()
     assert state.load_finding(current.id, config).status is FindingStatus.OPEN
+    events = (state.root / "events.jsonl").read_text()
+    assert '"type":"loop.paused"' in events
+    assert '"type":"rollback.opened"' in events
+    assert pause_syncs == ["fix_dispatch"]
+
+    repeated = handle_recurrence(
+        state,
+        config,
+        current,
+        now=NOW,
+        publisher=publisher,
+        pause_sync=lambda _config: pause_syncs.append("fix_dispatch"),
+    )
+    assert repeated.opened is False
+    assert publisher.calls == ["deadbee123456789"]
+    assert pause_syncs == ["fix_dispatch"]
+    assert events == (state.root / "events.jsonl").read_text()
+
+
+def test_verify_only_stream_override_cannot_dispatch_recurrence_rollback(
+    tmp_path: Path,
+) -> None:
+    state, config = configured(tmp_path)
+    authorize_full(config)
+    config.streams = [
+        StreamConfig(
+            id="support-agent-aabbccdd",
+            name="support-agent",
+            grouping="trace_name",
+            grouping_key="traceName",
+            grouping_value_hash="aabbccddeeff",
+            trace_names=["support-agent"],
+            mode=LoopMode.VERIFY,
+        )
+    ]
+    state.save_config(config)
+    prior = finding(
+        "mh-20260810-0123456789",
+        detected_at=NOW - timedelta(hours=3),
+        merge=MergeRecord(
+            mode="human",
+            merged_at=NOW - timedelta(hours=2),
+            commit="deadbee123456789",
+            pull_request_number=16,
+        ),
+    )
+    current = finding(
+        "mh-20260811-fedcba9876",
+        status=FindingStatus.OPEN,
+        detected_at=NOW,
+    )
+    current.attempts = []
+    state.save_finding(prior, config)
+    state.save_finding(current, config)
+    publisher = FakeRollbackPublisher()
+    pause_syncs: list[str] = []
+
+    decision = handle_recurrence(
+        state,
+        config,
+        current,
+        now=NOW,
+        publisher=publisher,
+        pause_sync=lambda _config: pause_syncs.append("fix_dispatch"),
+    )
+
+    assert decision.opened is False
+    assert publisher.calls == []
+    assert pause_syncs == []
+    assert not state.lock_path.exists()
 
 
 def test_recurrence_pauses_even_if_revert_creation_fails(tmp_path: Path) -> None:
     state, config = configured(tmp_path)
+    authorize_full(config)
     config.auto_merge = AutoMergeConfig(enabled_at=NOW - timedelta(hours=2))
     state.save_config(config)
     prior = finding(
@@ -385,7 +491,21 @@ def test_recurrence_pauses_even_if_revert_creation_fails(tmp_path: Path) -> None
             current,
             now=NOW,
             publisher=FakeRollbackPublisher(fail=True),
+            pause_sync=lambda _config: None,
         )
     assert state.lock_path.is_file()
     assert config.fixes is not None
-    assert (Path(config.fixes.repo_local_path) / ".maida" / "heal.lock").is_file()
+    assert (config.fixes.local_repo() / ".maida" / "heal.lock").is_file()
+
+    recovered = FakeRollbackPublisher()
+    decision = handle_recurrence(
+        state,
+        config,
+        current,
+        now=NOW,
+        publisher=recovered,
+        pause_sync=lambda _config: None,
+    )
+    assert decision.opened is True
+    assert recovered.calls == ["deadbee123456789"]
+    assert '"type":"rollback.opened"' in (state.root / "events.jsonl").read_text()

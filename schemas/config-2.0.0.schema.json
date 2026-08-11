@@ -1,0 +1,625 @@
+{
+  "$defs": {
+    "ActivationConfig": {
+      "additionalProperties": false,
+      "description": "Audit artifact recording who authorized unattended full mode.",
+      "properties": {
+        "acknowledged_by": {
+          "maxLength": 240,
+          "minLength": 3,
+          "title": "Acknowledged By",
+          "type": "string"
+        },
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "statement": {
+          "const": "autonomous-fix-loop-authorized",
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "acknowledged_by",
+        "date",
+        "statement"
+      ],
+      "title": "ActivationConfig",
+      "type": "object"
+    },
+    "AutoMergeConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "daily_budget": {
+          "default": 3,
+          "minimum": 1,
+          "title": "Daily Budget",
+          "type": "integer"
+        },
+        "enabled_at": {
+          "format": "date-time",
+          "title": "Enabled At",
+          "type": "string"
+        },
+        "max_diff_lines": {
+          "default": 200,
+          "minimum": 1,
+          "title": "Max Diff Lines",
+          "type": "integer"
+        },
+        "recurrence_hours": {
+          "default": 48,
+          "minimum": 1,
+          "title": "Recurrence Hours",
+          "type": "integer"
+        }
+      },
+      "title": "AutoMergeConfig",
+      "type": "object"
+    },
+    "EnvelopeConfig": {
+      "additionalProperties": false,
+      "description": "Per-stream overrides for conservative generated policy envelopes.",
+      "properties": {
+        "confidence": {
+          "default": 0.95,
+          "exclusiveMaximum": 1,
+          "minimum": 0.5,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "coverage": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1,
+              "minimum": 0.5,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Coverage"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "enum": [
+              "gating",
+              "report_only",
+              "disabled"
+            ],
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "step_count",
+              "tool_call_count",
+              "latency_ms",
+              "cost_tokens",
+              "task_pass_rate"
+            ]
+          },
+          "title": "Metrics",
+          "type": "object"
+        }
+      },
+      "title": "EnvelopeConfig",
+      "type": "object"
+    },
+    "EventConfig": {
+      "additionalProperties": false,
+      "description": "Versioned event delivery configuration; local JSONL is always active.",
+      "properties": {
+        "sinks": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "github": "#/$defs/GitHubSinkConfig",
+                "jsonl": "#/$defs/JsonlSinkConfig",
+                "webhook": "#/$defs/WebhookSinkConfig"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/JsonlSinkConfig"
+              },
+              {
+                "$ref": "#/$defs/WebhookSinkConfig"
+              },
+              {
+                "$ref": "#/$defs/GitHubSinkConfig"
+              }
+            ]
+          },
+          "title": "Sinks",
+          "type": "array"
+        }
+      },
+      "title": "EventConfig",
+      "type": "object"
+    },
+    "FixesConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Paths",
+          "type": "array"
+        },
+        "auto_propose": {
+          "default": true,
+          "title": "Auto Propose",
+          "type": "boolean"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "cooldown_hours": {
+          "default": 24,
+          "maximum": 720,
+          "minimum": 0,
+          "title": "Cooldown Hours",
+          "type": "integer"
+        },
+        "fixer": {
+          "enum": [
+            "claude-code",
+            "api",
+            "command"
+          ],
+          "title": "Fixer",
+          "type": "string"
+        },
+        "max_attempts_per_finding": {
+          "default": 2,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Attempts Per Finding",
+          "type": "integer"
+        },
+        "repo": {
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "repo_local_path": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repo Local Path"
+        }
+      },
+      "required": [
+        "repo",
+        "fixer"
+      ],
+      "title": "FixesConfig",
+      "type": "object"
+    },
+    "GateConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Command",
+          "type": "array"
+        },
+        "enabled_at": {
+          "format": "date-time",
+          "title": "Enabled At",
+          "type": "string"
+        },
+        "holdout_command": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Holdout Command"
+        },
+        "holdout_fraction": {
+          "default": 0.25,
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "title": "Holdout Fraction",
+          "type": "number"
+        },
+        "manifest_path": {
+          "default": ".maida/heal.yaml",
+          "title": "Manifest Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "title": "GateConfig",
+      "type": "object"
+    },
+    "GitHubSinkConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "github",
+          "default": "github",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "title": "GitHubSinkConfig",
+      "type": "object"
+    },
+    "JsonlSinkConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "jsonl",
+          "default": "jsonl",
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "default": ".maida-heal/events.jsonl",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "title": "JsonlSinkConfig",
+      "type": "object"
+    },
+    "LangfuseConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_source": {
+          "enum": [
+            "environment",
+            "config",
+            "fixture"
+          ],
+          "title": "Credential Source",
+          "type": "string"
+        },
+        "cursor_overlap_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 0,
+          "title": "Cursor Overlap Seconds",
+          "type": "integer"
+        },
+        "host": {
+          "minLength": 1,
+          "title": "Host",
+          "type": "string"
+        },
+        "metadata_keys": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Metadata Keys",
+          "type": "array"
+        },
+        "window_days": {
+          "default": 14,
+          "maximum": 90,
+          "minimum": 1,
+          "title": "Window Days",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "credential_source"
+      ],
+      "title": "LangfuseConfig",
+      "type": "object"
+    },
+    "LoopMode": {
+      "description": "Configuration profiles ordered by the actions they authorize.",
+      "enum": [
+        "shadow",
+        "propose",
+        "verify",
+        "full"
+      ],
+      "title": "LoopMode",
+      "type": "string"
+    },
+    "StreamConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "envelope": {
+          "$ref": "#/$defs/EnvelopeConfig"
+        },
+        "grouping": {
+          "enum": [
+            "session_pattern",
+            "metadata",
+            "trace_name"
+          ],
+          "title": "Grouping",
+          "type": "string"
+        },
+        "grouping_key": {
+          "minLength": 1,
+          "title": "Grouping Key",
+          "type": "string"
+        },
+        "grouping_value_hash": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Grouping Value Hash",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoopMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "outlier": {
+          "default": false,
+          "title": "Outlier",
+          "type": "boolean"
+        },
+        "selectors": {
+          "items": {
+            "$ref": "#/$defs/StreamSelector"
+          },
+          "title": "Selectors",
+          "type": "array"
+        },
+        "status": {
+          "default": "watching",
+          "enum": [
+            "watching",
+            "insufficient-data",
+            "excluded"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "trace_names": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Trace Names",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "grouping",
+        "grouping_key",
+        "grouping_value_hash",
+        "trace_names"
+      ],
+      "title": "StreamConfig",
+      "type": "object"
+    },
+    "StreamSelector": {
+      "additionalProperties": false,
+      "properties": {
+        "grouping": {
+          "enum": [
+            "session_pattern",
+            "metadata",
+            "trace_name"
+          ],
+          "title": "Grouping",
+          "type": "string"
+        },
+        "grouping_key": {
+          "minLength": 1,
+          "title": "Grouping Key",
+          "type": "string"
+        },
+        "grouping_value_hash": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Grouping Value Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "grouping",
+        "grouping_key",
+        "grouping_value_hash"
+      ],
+      "title": "StreamSelector",
+      "type": "object"
+    },
+    "WebhookSinkConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "initial_backoff_seconds": {
+          "default": 0.25,
+          "maximum": 30,
+          "minimum": 0,
+          "title": "Initial Backoff Seconds",
+          "type": "number"
+        },
+        "kind": {
+          "const": "webhook",
+          "default": "webhook",
+          "title": "Kind",
+          "type": "string"
+        },
+        "max_attempts": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "secret_env": {
+          "pattern": "^[A-Z_][A-Z0-9_]*$",
+          "title": "Secret Env",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 5.0,
+          "exclusiveMinimum": 0,
+          "maximum": 60,
+          "title": "Timeout Seconds",
+          "type": "number"
+        },
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "secret_env"
+      ],
+      "title": "WebhookSinkConfig",
+      "type": "object"
+    }
+  },
+  "$id": "https://maida.ai/schemas/maida-heal/config/2.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "activation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ActivationConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "auto_merge": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AutoMergeConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "events": {
+      "$ref": "#/$defs/EventConfig"
+    },
+    "fixes": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FixesConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "gate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GateConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "langfuse": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LangfuseConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "mode": {
+      "$ref": "#/$defs/LoopMode",
+      "default": "shadow"
+    },
+    "schema_version": {
+      "const": "2.0.0",
+      "default": "2.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "streams": {
+      "items": {
+        "$ref": "#/$defs/StreamConfig"
+      },
+      "title": "Streams",
+      "type": "array"
+    }
+  },
+  "title": "HealConfig",
+  "type": "object",
+  "x-schema-version": "2.0.0"
+}

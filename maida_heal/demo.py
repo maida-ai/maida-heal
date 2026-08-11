@@ -2,18 +2,26 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from maida_heal.core import MaidaCLI
-from maida_heal.gate import enable_gate, verify_closure
+from maida_heal.events import EventJournal
+from maida_heal.gate import closure_markdown, enable_gate, verify_closure
 from maida_heal.gitops import Worktree
 from maida_heal.healing import Publisher, PullRequest, propose_fix
-from maida_heal.models import ClosureReport, FixesConfig
+from maida_heal.models import (
+    ActivationConfig,
+    ClosureReport,
+    FixesConfig,
+    JsonlSinkConfig,
+    LoopMode,
+)
 from maida_heal.onboarding import (
     apply_stream_edits,
     attach,
@@ -48,6 +56,8 @@ class DemoResult:
     changed_paths: tuple[str, ...]
     diff_lines: int
     closure: ClosureReport
+    events: tuple[dict[str, object], ...]
+    pr_comment: str
 
 
 def _git(repo: Path, *arguments: str) -> None:
@@ -127,6 +137,7 @@ def run_demo() -> DemoResult:
 
         repo = _initialize_demo_repo(root / "agent-config")
         config = state.load_config()
+        config.events.sinks = [JsonlSinkConfig(path=str(state.root / "events.jsonl"))]
         config.fixes = FixesConfig(
             repo="local/demo",
             repo_local_path=str(repo),
@@ -136,6 +147,22 @@ def run_demo() -> DemoResult:
         )
         state.save_config(config)
         command = _gate_command()
+        enable_gate(
+            state,
+            config,
+            MaidaCLI(state),
+            command=command,
+            holdout_command=command,
+            now=DEMO_NOW,
+        )
+        config = state.load_config()
+        config.activation = ActivationConfig(
+            acknowledged_by="Maida-heal offline demo",
+            date=date(2026, 8, 11),
+            statement="autonomous-fix-loop-authorized",
+        )
+        config.mode = LoopMode.FULL
+        state.save_config(config)
         enable_gate(
             state,
             config,
@@ -155,12 +182,23 @@ def run_demo() -> DemoResult:
             dry_run=False,
             publisher=LocalDemoPublisher(),
         )
+        current = state.load_config()
+        state.reconcile_finding_events(current)
+        EventJournal(state.project_root, current.events).flush()
         _git(repo, "switch", proposed.branch)
         closure = verify_closure(repo, finding.id, now=DEMO_NOW)
+        event_path = state.root / "events.jsonl"
+        events = tuple(
+            payload
+            for line in event_path.read_text(encoding="utf-8").splitlines()
+            if (payload := json.loads(line)).get("finding_id") == finding.id
+        )
         return DemoResult(
             finding_id=finding.id,
             detection_report=report.relative_to(control).as_posix(),
             changed_paths=proposed.inspection.changed_paths,
             diff_lines=proposed.inspection.diff_lines,
             closure=closure,
+            events=events,
+            pr_comment=closure_markdown(closure),
         )

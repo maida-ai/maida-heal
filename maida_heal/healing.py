@@ -1,4 +1,4 @@
-"""Tier-2 fix proposal orchestration with independent post-hoc enforcement."""
+"""Fix proposal orchestration with independent post-hoc enforcement."""
 
 from __future__ import annotations
 
@@ -6,31 +6,37 @@ import json
 import os
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 import yaml
 
 from maida_heal.fixers import Fixer, fixer_from_config
 from maida_heal.gitops import (
     DiffInspection,
+    GitError,
     Worktree,
     changed_symlink_violation,
     commit_fix,
+    committed_fix_inspection,
     create_worktree,
     inspect_diff,
     localize,
+    resume_worktree,
     validate_changed_paths,
     writable_symlinks,
 )
+from maida_heal.killswitch import lock_blocks
 from maida_heal.models import (
     Actor,
     Finding,
     FindingStatus,
     FixAttempt,
     HealConfig,
+    LoopMode,
     jsonable,
 )
 from maida_heal.state import StateError, StateStore
@@ -57,8 +63,61 @@ class Publisher(Protocol):
     ) -> PullRequest: ...
 
 
+@runtime_checkable
+class RecoverablePublisher(Publisher, Protocol):
+    def find_existing(
+        self, branch: str, *, repository: str, repo: Path
+    ) -> PullRequest | None: ...
+
+
 class GitHubPublisher:
     """Publish through the user's existing git remote and `gh` authentication."""
+
+    def find_existing(
+        self, branch: str, *, repository: str, repo: Path
+    ) -> PullRequest | None:
+        viewed = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repository,
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--limit",
+                "1",
+                "--json",
+                "number,url",
+            ],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if viewed.returncode != 0:
+            raise PublishError(
+                "could not reconcile the claimed fix branch; refusing duplicate "
+                "dispatch"
+            )
+        try:
+            payload = json.loads(viewed.stdout)
+        except json.JSONDecodeError as error:
+            raise PublishError(
+                "gh returned invalid pull-request recovery data"
+            ) from error
+        if not isinstance(payload, list) or not payload:
+            return None
+        item = payload[0]
+        if (
+            not isinstance(item, dict)
+            or not isinstance(item.get("number"), int)
+            or not isinstance(item.get("url"), str)
+        ):
+            raise PublishError("gh returned invalid pull-request recovery data")
+        return PullRequest(number=item["number"], url=item["url"])
 
     def publish(
         self,
@@ -68,6 +127,11 @@ class GitHubPublisher:
         repository: str,
         body: str,
     ) -> PullRequest:
+        existing = self.find_existing(
+            worktree.branch, repository=repository, repo=worktree.path
+        )
+        if existing is not None:
+            return existing
         pushed = subprocess.run(
             ["git", "push", "--set-upstream", "origin", worktree.branch],
             cwd=worktree.path,
@@ -128,6 +192,37 @@ class FixResult:
     inspection: DiffInspection
     pull_request: PullRequest | None = None
     rejection: str | None = None
+
+
+def expire_exhausted_finding(
+    state: StateStore,
+    config: HealConfig,
+    finding: Finding,
+    *,
+    now: datetime,
+) -> bool:
+    """Persist the terminal state once an unattended finding uses its budget."""
+    if config.fixes is None or finding.status not in {
+        FindingStatus.OPEN,
+        FindingStatus.FIX_REJECTED,
+    }:
+        return False
+    if finding.attempts and finding.attempts[-1].outcome == "running":
+        return False
+    if len(finding.attempts) < config.fixes.max_attempts_per_finding:
+        return False
+    finding.transition(
+        FindingStatus.EXPIRED,
+        actor=Actor.SYSTEM,
+        action="finding_expired",
+        detail=(
+            f"Finding exhausted {config.fixes.max_attempts_per_finding} configured "
+            "fix attempts."
+        ),
+        at=now,
+    )
+    state.save_finding(finding, config)
+    return True
 
 
 def _policy_metrics(state: StateStore, finding: Finding) -> dict[str, object]:
@@ -243,6 +338,19 @@ behavioral verifier.
 """
 
 
+def _gate_enabled_for_finding(config: HealConfig, finding: Finding) -> bool:
+    if config.gate is None:
+        return False
+    stream = next(
+        (item for item in config.streams if item.id == finding.stream_id), None
+    )
+    return (
+        config.mode.allows(LoopMode.VERIFY)
+        if stream is None
+        else config.effective_mode(stream).allows(LoopMode.VERIFY)
+    )
+
+
 def _transition_to_proposed(finding: Finding, *, now: datetime, attempt: int) -> None:
     finding.transition(
         FindingStatus.FIX_PROPOSED,
@@ -250,6 +358,39 @@ def _transition_to_proposed(finding: Finding, *, now: datetime, attempt: int) ->
         action="fix_proposed",
         detail=f"Fix writer completed attempt {attempt}; post-hoc checks started.",
         at=now,
+    )
+
+
+def _finish_recovered_proposal(
+    state: StateStore,
+    config: HealConfig,
+    finding: Finding,
+    *,
+    now: datetime,
+    published: PullRequest,
+    inspection: DiffInspection,
+    worktree: Worktree | None,
+) -> FixResult:
+    claim = finding.attempts[-1]
+    if claim.outcome != "running":
+        raise StateError("fix-attempt claim is missing or inconsistent")
+    claim.outcome = "proposed"
+    claim.finished_at = now
+    claim.changed_paths = list(inspection.changed_paths)
+    claim.diff_lines = inspection.diff_lines
+    claim.pull_request_number = published.number
+    claim.pull_request_url = published.url
+    _transition_to_proposed(finding, now=now, attempt=claim.number)
+    state.save_finding(finding, config)
+    if worktree is not None:
+        worktree.cleanup(delete_branch=False)
+    return FixResult(
+        finding.id,
+        claim.number,
+        "proposed",
+        claim.branch,
+        inspection,
+        pull_request=published,
     )
 
 
@@ -266,17 +407,13 @@ def _reject(
 ) -> FixResult:
     if config.fixes is None:
         raise ValueError("fixes are not enabled")
-    attempt = FixAttempt(
-        number=attempt_number,
-        fixer=config.fixes.fixer,
-        branch=worktree.branch,
-        started_at=now,
-        finished_at=now,
-        outcome="rejected",
-        changed_paths=list(inspection.changed_paths),
-        diff_lines=inspection.diff_lines,
-    )
-    finding.attempts.append(attempt)
+    attempt = finding.attempts[-1]
+    if attempt.number != attempt_number or attempt.outcome != "running":
+        raise ValueError("fix-attempt claim is missing or inconsistent")
+    attempt.finished_at = now
+    attempt.outcome = "rejected"
+    attempt.changed_paths = list(inspection.changed_paths)
+    attempt.diff_lines = inspection.diff_lines
     finding.cooldown_until = now + timedelta(hours=config.fixes.cooldown_hours)
     finding.transition(
         FindingStatus.FIX_REJECTED,
@@ -306,12 +443,29 @@ def propose_fix(
     dry_run: bool,
     fixer: Fixer | None = None,
     publisher: Publisher | None = None,
+    checkpoint: Callable[[str], None] | None = None,
 ) -> FixResult:
     if config.fixes is None:
-        raise StateError("Fixes are not enabled. Run `maida-heal enable fixes` first.")
-    if state.lock_path.exists():
+        raise StateError(
+            "Fixes are not configured. Set mode: propose and add the fixes block "
+            "in `.maida-heal/config.yaml`."
+        )
+    if lock_blocks(state.lock_path, operation="fix_dispatch"):
         raise StateError("Maida-heal is paused; fixes are disabled by the kill switch")
     finding = state.load_finding(finding_id, config)
+    stream = next(
+        (item for item in config.streams if item.id == finding.stream_id), None
+    )
+    if stream is not None and not stream.enabled:
+        raise StateError(f"stream {stream.id} is disabled; fix dispatch is not allowed")
+    effective_mode = (
+        config.effective_mode(stream) if stream is not None else config.mode
+    )
+    if not effective_mode.allows(LoopMode.PROPOSE):
+        raise StateError(
+            f"finding {finding.id} is configured for {effective_mode.value}; "
+            "fix dispatch requires propose or a later profile"
+        )
     if finding.status not in {FindingStatus.OPEN, FindingStatus.FIX_REJECTED}:
         raise ValueError(
             f"finding {finding.id} cannot be fixed from {finding.status.value}"
@@ -320,12 +474,94 @@ def propose_fix(
         raise ValueError(
             f"finding cooldown is active until {finding.cooldown_until.isoformat()}"
         )
-    attempt_number = len(finding.attempts) + 1
+    repo = config.fixes.local_repo()
+    selected_publisher = publisher or GitHubPublisher()
+    reusing_claim = bool(finding.attempts and finding.attempts[-1].outcome == "running")
+    if reusing_claim:
+        claimed = finding.attempts[-1]
+        if not isinstance(selected_publisher, RecoverablePublisher):
+            raise StateError(
+                f"finding {finding.id} already has claimed attempt {claimed.number}; "
+                "refusing duplicate fix dispatch"
+            )
+        existing = selected_publisher.find_existing(
+            claimed.branch,
+            repository=config.fixes.repo,
+            repo=repo,
+        )
+        claimed_worktree = Worktree(
+            repo=repo,
+            path=state.root / "worktrees" / f"{finding.id}-a{claimed.number}",
+            branch=claimed.branch,
+        )
+        if existing is not None:
+            recovered = (
+                committed_fix_inspection(claimed_worktree, finding.id)
+                if claimed_worktree.path.exists()
+                else None
+            )
+            return _finish_recovered_proposal(
+                state,
+                config,
+                finding,
+                now=now,
+                published=existing,
+                inspection=recovered
+                or DiffInspection(tuple(claimed.changed_paths), claimed.diff_lines, ""),
+                worktree=claimed_worktree if claimed_worktree.path.exists() else None,
+            )
+        if not claimed_worktree.path.exists():
+            try:
+                claimed_worktree = resume_worktree(
+                    repo, claimed_worktree.path, claimed.branch
+                )
+            except GitError:
+                claimed_worktree = Worktree(
+                    repo=repo,
+                    path=claimed_worktree.path,
+                    branch=claimed.branch,
+                )
+        recovered = (
+            committed_fix_inspection(claimed_worktree, finding.id)
+            if claimed_worktree.path.exists()
+            else None
+        )
+        if recovered is not None:
+            violation = validate_changed_paths(
+                recovered.changed_paths, config.fixes.allowed_paths
+            ) or changed_symlink_violation(
+                claimed_worktree.path, recovered.changed_paths
+            )
+            if violation is not None:
+                raise StateError(
+                    "claimed fix branch failed recovery path enforcement; refusing "
+                    "publication"
+                )
+            published = selected_publisher.publish(
+                claimed_worktree,
+                finding,
+                repository=config.fixes.repo,
+                body=_pr_body(
+                    finding, gate_enabled=_gate_enabled_for_finding(config, finding)
+                ),
+            )
+            return _finish_recovered_proposal(
+                state,
+                config,
+                finding,
+                now=now,
+                published=published,
+                inspection=recovered,
+                worktree=claimed_worktree,
+            )
+        claimed_worktree.cleanup(delete_branch=True)
+        attempt_number = claimed.number
+    else:
+        attempt_number = len(finding.attempts) + 1
     if attempt_number > config.fixes.max_attempts_per_finding:
         raise ValueError(
             f"finding exhausted {config.fixes.max_attempts_per_finding} fix attempts"
         )
-    repo = Path(config.fixes.repo_local_path).expanduser().resolve()
     localization = finding.localization or localize(
         repo,
         onset=finding.onset_at or finding.detected_at,
@@ -340,6 +576,19 @@ def propose_fix(
         ],
     )
     branch = f"maida-heal/{finding.id}-a{attempt_number}"
+    if not dry_run and not reusing_claim:
+        finding.attempts.append(
+            FixAttempt(
+                number=attempt_number,
+                fixer=config.fixes.fixer,
+                branch=branch,
+                started_at=now,
+                outcome="running",
+            )
+        )
+        state.save_finding(finding, config)
+        if checkpoint is not None:
+            checkpoint("attempt_claimed")
     worktree = create_worktree(
         repo,
         state.root / "worktrees" / f"{finding.id}-a{attempt_number}",
@@ -423,25 +672,21 @@ def propose_fix(
             reason=f"{violation.reason}: {', '.join(violation.offending_paths)}",
         )
     commit_fix(worktree, finding.id, finding.title)
-    published = (publisher or GitHubPublisher()).publish(
+    published = selected_publisher.publish(
         worktree,
         finding,
         repository=config.fixes.repo,
-        body=_pr_body(finding, gate_enabled=config.gate is not None),
+        body=_pr_body(finding, gate_enabled=_gate_enabled_for_finding(config, finding)),
     )
-    attempt = FixAttempt(
-        number=attempt_number,
-        fixer=config.fixes.fixer,
-        branch=branch,
-        started_at=now,
-        finished_at=now,
-        outcome="proposed",
-        changed_paths=list(inspection.changed_paths),
-        diff_lines=inspection.diff_lines,
-        pull_request_number=published.number,
-        pull_request_url=published.url,
-    )
-    finding.attempts.append(attempt)
+    attempt = finding.attempts[-1]
+    if attempt.number != attempt_number or attempt.outcome != "running":
+        raise ValueError("fix-attempt claim is missing or inconsistent")
+    attempt.finished_at = now
+    attempt.outcome = "proposed"
+    attempt.changed_paths = list(inspection.changed_paths)
+    attempt.diff_lines = inspection.diff_lines
+    attempt.pull_request_number = published.number
+    attempt.pull_request_url = published.url
     finding.cooldown_until = None
     state.save_finding(finding, config)
     worktree.cleanup(delete_branch=False)

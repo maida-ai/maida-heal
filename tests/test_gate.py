@@ -1,24 +1,44 @@
+import json
 import subprocess
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
+from pytest import MonkeyPatch
+from typer.testing import CliRunner
 
+from maida_heal.cli import app
 from maida_heal.core import MaidaCLI, ReportCompatibilityError
-from maida_heal.gate import ClosureRunner, GateError, enable_gate, verify_closure
+from maida_heal.gate import (
+    ClosureRunner,
+    GateError,
+    VerificationNotEnabled,
+    enable_gate,
+    verify_closure,
+)
 from maida_heal.models import (
+    ActivationConfig,
     Actor,
+    AutoMergeConfig,
+    EventConfig,
     FindingStatus,
     FixAttempt,
     FixesConfig,
+    LoopMode,
+    WebhookSinkConfig,
 )
 from maida_heal.onboarding import (
     apply_stream_edits,
     attach,
     fixture_attachment_client,
 )
-from maida_heal.state import StateStore, write_json
+from maida_heal.state import (
+    StateStore,
+    load_gate_manifest,
+    save_gate_manifest,
+    write_json,
+)
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 
@@ -145,6 +165,12 @@ class NoReportRunner(ClosureRunner):
         return 0
 
 
+class ExplodingRunner(ClosureRunner):
+    def run(self, command: Sequence[str], *, cwd: Path) -> int:
+        del command, cwd
+        raise AssertionError("a persisted closure must not rerun verification")
+
+
 def proposed(state: StateStore, finding_id: str) -> None:
     config = state.load_config()
     finding = state.load_finding(finding_id, config)
@@ -188,6 +214,176 @@ def test_closure_passes_only_when_specific_metric_holdout_and_full_gate_pass(
     assert all(item.passed for item in closure.conditions)
     stored = state.load_finding(finding_id, state.load_config())
     assert stored.status is FindingStatus.CLOSED
+
+
+def test_restart_after_terminal_write_replays_verified_event_without_rerunning_gate(
+    tmp_path: Path,
+) -> None:
+    state, repo, finding_id = scaffold(tmp_path)
+    proposed(state, finding_id)
+    first = verify_closure(
+        repo,
+        finding_id,
+        now=NOW,
+        runner=ReportRunner(report(), report()),
+    )
+    journal = repo / ".maida-heal" / "events.jsonl"
+    journal.unlink()
+    for path in (repo / ".maida-heal" / "events").rglob("*.json"):
+        path.unlink()
+
+    recovered = verify_closure(
+        repo,
+        finding_id,
+        now=NOW,
+        runner=ExplodingRunner(),
+    )
+    verify_closure(repo, finding_id, now=NOW, runner=ExplodingRunner())
+
+    assert recovered == first
+    events = [json.loads(line) for line in journal.read_text().splitlines()]
+    assert [event["type"] for event in events] == ["fix.verified"]
+    assert len({event["event_id"] for event in events}) == 1
+
+
+def test_full_handoff_emits_verified_event_and_never_calls_merge(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    state, repo, finding_id = scaffold(tmp_path)
+    proposed(state, finding_id)
+    manifest = load_gate_manifest(repo)
+    manifest.activation = ActivationConfig(
+        acknowledged_by="Operator <operator@example.test>",
+        date=date(2026, 8, 11),
+        statement="autonomous-fix-loop-authorized",
+    )
+    manifest.mode = LoopMode.FULL
+    manifest.stream_modes = {
+        stream_id: LoopMode.FULL for stream_id in manifest.stream_modes
+    }
+    save_gate_manifest(repo, manifest)
+    merge_calls: list[bool] = []
+    monkeypatch.setattr(
+        "maida_heal.release.maybe_auto_merge",
+        lambda *_args, **_kwargs: merge_calls.append(True),
+    )
+
+    closure = verify_closure(
+        repo,
+        finding_id,
+        now=NOW,
+        runner=ReportRunner(report(), report()),
+    )
+
+    assert closure.verdict == "closed"
+    assert merge_calls == []
+    events = [
+        json.loads(line)
+        for line in (repo / ".maida-heal" / "events.jsonl").read_text().splitlines()
+    ]
+    verified = next(item for item in events if item["type"] == "fix.verified")
+    assert verified["data"]["release_mode"] == "handoff"
+    assert verified["data"]["release_ready"] is True
+    assert verified["data"]["closure_report"]["verdict"] == "closed"
+
+
+def test_full_profile_respects_verify_only_stream_override(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    state, repo, finding_id = scaffold(tmp_path)
+    proposed(state, finding_id)
+    finding = state.load_finding(finding_id, state.load_config())
+    manifest = load_gate_manifest(repo)
+    manifest.activation = ActivationConfig(
+        acknowledged_by="Operator <operator@example.test>",
+        date=date(2026, 8, 11),
+        statement="autonomous-fix-loop-authorized",
+    )
+    manifest.mode = LoopMode.FULL
+    manifest.stream_modes[finding.stream_id] = LoopMode.VERIFY
+    manifest.auto_merge = AutoMergeConfig(enabled_at=NOW)
+    save_gate_manifest(repo, manifest)
+    merge_calls: list[bool] = []
+    monkeypatch.setattr(
+        "maida_heal.release.maybe_auto_merge",
+        lambda *_args, **_kwargs: merge_calls.append(True),
+    )
+
+    verify_closure(
+        repo,
+        finding_id,
+        now=NOW,
+        runner=ReportRunner(report(), report()),
+    )
+
+    assert merge_calls == []
+    events = [
+        json.loads(line)
+        for line in (repo / ".maida-heal" / "events.jsonl").read_text().splitlines()
+    ]
+    verified = next(item for item in events if item["type"] == "fix.verified")
+    assert verified["data"]["release_mode"] == "verify_only"
+    assert verified["data"]["release_ready"] is False
+
+
+def test_scaffold_maps_webhook_secret_name_into_ci_environment(
+    tmp_path: Path,
+) -> None:
+    state, repo, _finding_id = scaffold(tmp_path)
+    config = state.load_config()
+    config.events = EventConfig(
+        sinks=[
+            WebhookSinkConfig(
+                url="https://hooks.example.test/maida-heal",
+                secret_env="MAIDA_HEAL_WEBHOOK_SECRET",
+            )
+        ]
+    )
+    state.save_config(config)
+
+    enable_gate(
+        state,
+        config,
+        MaidaCLI(state),
+        command=["fixture-gate", "{report}", "{suite}"],
+        holdout_command=["fixture-holdout", "{report}", "{suite}"],
+        now=NOW,
+    )
+
+    workflow = (repo / ".github" / "workflows" / "maida-heal.yml").read_text()
+    assert (
+        "MAIDA_HEAL_WEBHOOK_SECRET: ${{ secrets.MAIDA_HEAL_WEBHOOK_SECRET }}"
+        in workflow
+    )
+    assert "fixture-webhook-secret" not in workflow
+
+
+def test_lower_stream_mode_skips_ci_closure_without_mutating_finding(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    state, repo, finding_id = scaffold(tmp_path)
+    proposed(state, finding_id)
+    finding = state.load_finding(finding_id, state.load_config())
+    manifest = load_gate_manifest(repo)
+    manifest.stream_modes[finding.stream_id] = LoopMode.PROPOSE
+    save_gate_manifest(repo, manifest)
+
+    with pytest.raises(VerificationNotEnabled, match="intentionally skipped"):
+        verify_closure(
+            repo,
+            finding_id,
+            now=NOW,
+            runner=ReportRunner(report(), report()),
+        )
+
+    monkeypatch.chdir(repo)
+    result = CliRunner().invoke(app, ["verify", finding_id, "--if-enabled"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["status"] == "skipped"
+    stored = state.load_finding(finding_id, state.load_config())
+    assert stored.status is FindingStatus.FIX_PROPOSED
+    workflow = (repo / ".github" / "workflows" / "maida-heal.yml").read_text()
+    assert 'verify "$finding" --if-enabled' in workflow
 
 
 @pytest.mark.parametrize(

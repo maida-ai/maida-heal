@@ -8,10 +8,16 @@ from pathlib import Path
 
 from maida_heal.core import MaidaCLI
 from maida_heal.discovery import discover_streams
+from maida_heal.events import DeliveryResponse, EventJournal
 from maida_heal.fixtures import fixture_observations, fixture_runs
 from maida_heal.healing import _pr_body, fixer_prompt
 from maida_heal.langfuse import HTTPClient, LangfuseCredentials, Observation
-from maida_heal.models import FixesConfig
+from maida_heal.models import (
+    EventConfig,
+    FixesConfig,
+    JsonlSinkConfig,
+    WebhookSinkConfig,
+)
 from maida_heal.onboarding import apply_stream_edits, attach
 from maida_heal.state import StateStore
 
@@ -45,6 +51,23 @@ class PayloadResponseClient(HTTPClient):
             ],
             "meta": {},
         }
+
+
+class CaptureWebhook:
+    def __init__(self) -> None:
+        self.bodies: list[bytes] = []
+
+    def post(
+        self,
+        url: str,
+        body: bytes,
+        headers: dict[str, str],
+        *,
+        timeout: float,
+    ) -> DeliveryResponse:
+        del url, headers, timeout
+        self.bodies.append(body)
+        return DeliveryResponse(202)
 
 
 def test_discovery_requests_no_io_fields_and_drops_payload_content() -> None:
@@ -107,6 +130,16 @@ def test_trace_metadata_value_never_reaches_persisted_or_outbound_surfaces(
         fixer="command",
         command=["fixture-fixer"],
     )
+    config.events = EventConfig(
+        sinks=[
+            JsonlSinkConfig(),
+            WebhookSinkConfig(
+                url="https://hooks.example.test/maida-heal",
+                secret_env="MAIDA_HEAL_WEBHOOK_SECRET",
+                initial_backoff_seconds=0,
+            ),
+        ]
+    )
     state.save_config(config)
     item = state.list_findings(config)[0]
     candidates = discover_streams(observations, metadata_keys=["agent_id"])
@@ -114,9 +147,26 @@ def test_trace_metadata_value_never_reaches_persisted_or_outbound_surfaces(
     serialized_findings = json.dumps(
         [finding.model_dump(mode="json") for finding in state.list_findings(config)]
     )
+    webhook = CaptureWebhook()
+    event_logs: list[dict[str, object]] = []
+    journal = EventJournal(
+        tmp_path,
+        config.events,
+        environ={"MAIDA_HEAL_WEBHOOK_SECRET": "fixture-secret"},
+        transport=webhook,
+        sleep=lambda _seconds: None,
+        log=event_logs.append,
+    )
+    state.reconcile_finding_events(config)
+    journal.flush()
+    serialized_events = (tmp_path / ".maida-heal" / "events.jsonl").read_text()
+    webhook_payloads = b"\n".join(webhook.bodies).decode()
     assert SENTINEL not in state.config_path.read_text(encoding="utf-8")
     assert SENTINEL not in serialized_findings
     assert SENTINEL not in "\n".join(progress)
     assert SENTINEL not in fixer_prompt(state, config, item)
     assert SENTINEL not in _pr_body(item, gate_enabled=False)
     assert SENTINEL not in candidates[0].name
+    assert SENTINEL not in serialized_events
+    assert SENTINEL not in webhook_payloads
+    assert SENTINEL not in json.dumps(event_logs)

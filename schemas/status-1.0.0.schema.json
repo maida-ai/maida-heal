@@ -1,0 +1,282 @@
+{
+  "$defs": {
+    "LoopMode": {
+      "description": "Configuration profiles ordered by the actions they authorize.",
+      "enum": [
+        "shadow",
+        "propose",
+        "verify",
+        "full"
+      ],
+      "title": "LoopMode",
+      "type": "string"
+    },
+    "StatusAutonomy": {
+      "additionalProperties": false,
+      "properties": {
+        "detect": {
+          "title": "Detect",
+          "type": "boolean"
+        },
+        "propose": {
+          "title": "Propose",
+          "type": "boolean"
+        },
+        "release": {
+          "enum": [
+            "none",
+            "handoff",
+            "auto_merge"
+          ],
+          "title": "Release",
+          "type": "string"
+        },
+        "verify": {
+          "title": "Verify",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "detect",
+        "propose",
+        "verify",
+        "release"
+      ],
+      "title": "StatusAutonomy",
+      "type": "object"
+    },
+    "StatusError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
+        }
+      },
+      "title": "StatusError",
+      "type": "object"
+    },
+    "StatusEventStream": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "jsonl",
+          "default": "jsonl",
+          "title": "Format",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "pending": {
+          "minimum": 0,
+          "title": "Pending",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "pending"
+      ],
+      "title": "StatusEventStream",
+      "type": "object"
+    },
+    "StatusLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "daily_merge_budget": {
+          "minimum": 1,
+          "title": "Daily Merge Budget",
+          "type": "integer"
+        },
+        "max_diff_lines": {
+          "minimum": 1,
+          "title": "Max Diff Lines",
+          "type": "integer"
+        },
+        "recurrence_hours": {
+          "minimum": 1,
+          "title": "Recurrence Hours",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_diff_lines",
+        "daily_merge_budget",
+        "recurrence_hours"
+      ],
+      "title": "StatusLimits",
+      "type": "object"
+    },
+    "StatusStream": {
+      "additionalProperties": false,
+      "properties": {
+        "effective_mode": {
+          "$ref": "#/$defs/LoopMode"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StatusError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "health": {
+          "enum": [
+            "healthy",
+            "degraded",
+            "never_run"
+          ],
+          "title": "Health",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_success_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Success At"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "enabled",
+        "effective_mode",
+        "health"
+      ],
+      "title": "StatusStream",
+      "type": "object"
+    }
+  },
+  "$id": "https://maida.ai/schemas/maida-heal/status/1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "autonomy": {
+      "$ref": "#/$defs/StatusAutonomy"
+    },
+    "event_stream": {
+      "$ref": "#/$defs/StatusEventStream"
+    },
+    "health": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "paused",
+        "not_configured",
+        "unknown"
+      ],
+      "title": "Health",
+      "type": "string"
+    },
+    "limits": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StatusLimits"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "mode": {
+      "$ref": "#/$defs/LoopMode"
+    },
+    "pause_scope": {
+      "anyOf": [
+        {
+          "enum": [
+            "all",
+            "fix_dispatch"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pause Scope"
+    },
+    "paused": {
+      "title": "Paused",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "streams": {
+      "items": {
+        "$ref": "#/$defs/StatusStream"
+      },
+      "title": "Streams",
+      "type": "array"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode",
+    "health",
+    "paused",
+    "updated_at",
+    "autonomy",
+    "event_stream",
+    "streams"
+  ],
+  "title": "StatusReport",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

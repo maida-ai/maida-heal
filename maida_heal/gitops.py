@@ -248,6 +248,64 @@ def create_worktree(repo: Path, path: Path, branch: str) -> Worktree:
     return Worktree(repo=root, path=path, branch=branch)
 
 
+def resume_worktree(repo: Path, path: Path, branch: str) -> Worktree:
+    """Reattach a durable fix branch after an interrupted publishing phase."""
+    root = git_root(repo)
+    if path.exists():
+        return Worktree(repo=root, path=path, branch=branch)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _run_git(root, ["worktree", "prune"])
+    existing = _run_git(
+        root,
+        ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+        accepted=frozenset({0, 1}),
+    )
+    if existing.returncode != 0:
+        raise GitError(f"fix branch does not exist: {branch}")
+    _run_git(root, ["worktree", "add", str(path), branch])
+    return Worktree(repo=root, path=path, branch=branch)
+
+
+def committed_fix_inspection(
+    worktree: Worktree, finding_id: str
+) -> DiffInspection | None:
+    """Return the committed patch only when it carries this finding's trailer."""
+    status = _run_git(
+        worktree.path, ["status", "--porcelain=v1", "--untracked-files=all"]
+    ).stdout
+    if status:
+        return None
+    message = _run_git(worktree.path, ["log", "-1", "--format=%B"]).stdout
+    if f"Maida-Heal-Finding: {finding_id}" not in message.splitlines():
+        return None
+    parent = _run_git(
+        worktree.path,
+        ["rev-parse", "--verify", "HEAD^"],
+        accepted=frozenset({0, 1}),
+    )
+    if parent.returncode != 0:
+        return None
+    changed = _run_git(
+        worktree.path,
+        ["diff", "--name-only", "--no-renames", "HEAD^", "HEAD", "--"],
+    ).stdout.splitlines()
+    normalized = tuple(sorted({_normal_path(item) for item in changed if item}))
+    diff_lines = 0
+    for row in _run_git(
+        worktree.path, ["diff", "--numstat", "HEAD^", "HEAD", "--"]
+    ).stdout.splitlines():
+        parts = row.split("\t", 2)
+        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+            diff_lines += int(parts[0]) + int(parts[1])
+        elif len(parts) >= 2 and "-" in parts[:2]:
+            diff_lines += 1_000_000_000
+    diff = _run_git(
+        worktree.path,
+        ["diff", "--no-ext-diff", "--binary", "HEAD^", "HEAD", "--"],
+    ).stdout
+    return DiffInspection(normalized, diff_lines, diff)
+
+
 def commit_fix(worktree: Worktree, finding_id: str, title: str) -> str:
     _run_git(worktree.path, ["add", "--all"])
     _run_git(

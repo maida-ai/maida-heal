@@ -1,4 +1,4 @@
-"""Tier-1 attachment and foreground watch orchestration."""
+"""Headless attachment and foreground watch orchestration."""
 
 from __future__ import annotations
 
@@ -30,7 +30,10 @@ from maida_heal.models import (
     ImportIndex,
     ImportRecord,
     LangfuseConfig,
+    LoopMode,
+    RuntimeHealth,
     StreamConfig,
+    StreamHealth,
     StreamSelector,
 )
 from maida_heal.state import StateStore, read_json
@@ -45,6 +48,24 @@ class AttachResult:
     window_start: datetime
     window_end: datetime
     detections: tuple[DetectionResult, ...]
+    errors: tuple[StreamFailure, ...] = ()
+
+
+@dataclass(frozen=True)
+class StreamFailure:
+    stream_id: str
+    phase: str
+    error_code: str
+    message: str = "stream cycle failed; inspect local structural reports"
+
+
+@dataclass(frozen=True)
+class AttachPlan:
+    streams: tuple[StreamConfig, ...]
+    traces: int
+    window_start: datetime
+    window_end: datetime
+    writes: tuple[str, ...]
 
 
 def candidate_to_config(candidate: StreamCandidate) -> StreamConfig:
@@ -63,9 +84,54 @@ def candidate_to_config(candidate: StreamCandidate) -> StreamConfig:
             for grouping, key, value in candidate.selectors
         ],
         trace_names=candidate.trace_names,
-        selected=candidate.selected,
+        enabled=candidate.selected,
         outlier=candidate.outlier,
         status="excluded" if not candidate.selected else "watching",
+    )
+
+
+def plan_attachment(
+    state: StateStore,
+    client: LangfuseClient,
+    *,
+    now: datetime,
+    metadata_keys: list[str],
+) -> AttachPlan:
+    """Discover the exact headless defaults without writing local state."""
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("attachment clock must include a timezone")
+    start = now - timedelta(days=14)
+    client.validate()
+    observations = client.discover(
+        from_time=start, to_time=now, metadata_keys=metadata_keys
+    )
+    if not observations:
+        raise ValueError("No Langfuse traces were found in the selected window")
+    streams = tuple(
+        candidate_to_config(item)
+        for item in discover_streams(observations, metadata_keys=metadata_keys)
+    )
+    writes = [state.config_path.relative_to(state.project_root).as_posix()]
+    for stream in streams:
+        if stream.enabled:
+            writes.append(
+                (state.streams_dir / stream.id / "<target>" / "policy.yaml")
+                .relative_to(state.project_root)
+                .as_posix()
+            )
+    writes.extend(
+        [
+            state.imports_path.relative_to(state.project_root).as_posix(),
+            ".maida-heal/findings/<finding-id>.json",
+            ".maida-heal/events.jsonl",
+        ]
+    )
+    return AttachPlan(
+        streams=streams,
+        traces=len(summarize_traces(observations)),
+        window_start=start,
+        window_end=now,
+        writes=tuple(dict.fromkeys(writes)),
     )
 
 
@@ -78,7 +144,7 @@ def apply_stream_edits(
     renames: dict[str, str] | None = None,
     merges: dict[str, list[str]] | None = None,
 ) -> list[StreamCandidate]:
-    """Apply flag- or prompt-driven selections without changing inference logic."""
+    """Apply deterministic config/fixture stream edits to inference results."""
     by_id = {item.id: item for item in candidates}
     if select_all:
         for item in candidates:
@@ -310,7 +376,7 @@ def attach(
     credential_source: str,
     now: datetime,
     metadata_keys: list[str],
-    configure: Callable[[list[StreamCandidate]], list[StreamCandidate]],
+    configure: Callable[[list[StreamCandidate]], list[StreamCandidate]] | None,
     progress: Progress,
     fixture_batch: list[FixtureRun] | None = None,
 ) -> AttachResult:
@@ -325,7 +391,8 @@ def attach(
     )
     if not observations:
         raise ValueError("No Langfuse traces were found in the selected window")
-    candidates = configure(discover_streams(observations, metadata_keys=metadata_keys))
+    discovered = discover_streams(observations, metadata_keys=metadata_keys)
+    candidates = configure(discovered) if configure is not None else discovered
     streams = [candidate_to_config(item) for item in candidates]
     if not any(item.selected for item in streams):
         raise ValueError("At least one discovered stream must be selected")
@@ -346,6 +413,7 @@ def attach(
     index.merge(records)
     state.save_imports(index)
     config = HealConfig(
+        mode=LoopMode.SHADOW,
         langfuse=LangfuseConfig(
             host=host,
             credential_source=credential_source,
@@ -357,27 +425,59 @@ def attach(
 
     progress("Baseline — deriving conservative policies from older samples")
     detections: list[DetectionResult] = []
+    errors: list[StreamFailure] = []
+    health = RuntimeHealth(
+        updated_at=now,
+        cycle_started_at=now,
+        streams={
+            stream.id: StreamHealth(stream_id=stream.id)
+            for stream in streams
+            if stream.enabled
+        },
+    )
     for stream in streams:
-        if not stream.selected:
+        if not stream.enabled:
             continue
-        stream_records = [item for item in records if item.stream_id == stream.id]
-        targets = prepare_stream_artifacts(
-            state, core, stream, stream_records, generated_at=now
-        )
-        if not targets:
-            stream.status = "insufficient-data"
-            continue
-        progress(f"Report — comparing the recent slice for {stream.name}")
-        detections.append(
-            evaluate_stream(state, core, config, stream, targets, detected_at=now)
-        )
+        health.streams[stream.id].last_attempt_at = now
+        try:
+            stream_records = [item for item in records if item.stream_id == stream.id]
+            targets = prepare_stream_artifacts(
+                state, core, stream, stream_records, generated_at=now
+            )
+            if not targets:
+                stream.status = "insufficient-data"
+            else:
+                progress(f"Report — comparing the recent slice for {stream.name}")
+                detections.append(
+                    evaluate_stream(
+                        state, core, config, stream, targets, detected_at=now
+                    )
+                )
+            health.streams[stream.id].status = "healthy"
+            health.streams[stream.id].last_success_at = now
+        except Exception as error:
+            stream.status = "watching"
+            health.streams[stream.id].status = "degraded"
+            health.streams[stream.id].error_code = type(error).__name__
+            health.streams[
+                stream.id
+            ].error_message = (
+                "stream attachment failed; inspect local structural reports"
+            )
+            errors.append(
+                StreamFailure(stream.id, "baseline_compare", type(error).__name__)
+            )
     state.save_config(config)
+    health.updated_at = now
+    health.cycle_completed_at = now
+    state.save_health(health)
     return AttachResult(
         streams=tuple(streams),
         traces=len(records),
         window_start=start,
         window_end=now,
         detections=tuple(detections),
+        errors=tuple(errors),
     )
 
 
@@ -389,11 +489,25 @@ def watch_once(
     now: datetime,
     progress: Progress,
     fixture_batch: list[FixtureRun] | None = None,
+    checkpoint: Callable[[str], None] | None = None,
 ) -> AttachResult:
     config = state.load_config()
     if config.langfuse is None:
-        raise ValueError("Tier 1 is not enabled")
-    start = now - timedelta(days=config.langfuse.window_days)
+        raise ValueError("shadow mode is not configured; run `maida-heal up`")
+    index = state.load_imports()
+    floor = now - timedelta(days=config.langfuse.window_days)
+    enabled_streams = [item for item in config.streams if item.enabled]
+    cursors = [
+        index.stream_cursors.get(stream.id, index.last_window_end or floor)
+        for stream in enabled_streams
+    ]
+    cursor = min(cursors, default=index.last_window_end or floor)
+    start = max(
+        floor,
+        cursor - timedelta(seconds=config.langfuse.cursor_overlap_seconds),
+    )
+    if start >= now:
+        start = max(floor, now - timedelta(seconds=1))
     progress(f"Import — checking {start.isoformat()} to {now.isoformat()}")
     client.validate()
     observations = client.discover(
@@ -409,38 +523,80 @@ def watch_once(
         host=config.langfuse.host,
         fixture_batch=fixture_batch,
     )
-    new_records = build_import_records(
-        observations, imported, core.list_runs(), config.streams
-    )
-    index = state.load_imports()
-    index.merge(new_records)
+    run_rows = core.list_runs()
+    errors: list[StreamFailure] = []
+    health = state.load_health()
+    health.cycle_started_at = now
+    health.cycle_completed_at = None
+    health.updated_at = now
+    for stream in enabled_streams:
+        health.streams.setdefault(stream.id, StreamHealth(stream_id=stream.id))
+        health.streams[stream.id].last_attempt_at = now
+        try:
+            new_records = build_import_records(
+                observations, imported, run_rows, [stream]
+            )
+            index.merge(new_records)
+            index.stream_cursors[stream.id] = now
+        except Exception as error:
+            health.streams[stream.id].status = "degraded"
+            health.streams[stream.id].error_code = type(error).__name__
+            health.streams[
+                stream.id
+            ].error_message = "stream import failed; inspect local structural reports"
+            errors.append(StreamFailure(stream.id, "import", type(error).__name__))
     index.last_window_start = start
     index.last_window_end = now
     state.save_imports(index)
+    if checkpoint is not None:
+        checkpoint("imports_persisted")
     detections: list[DetectionResult] = []
+    failed_imports = {item.stream_id for item in errors if item.phase == "import"}
     for stream in config.streams:
-        if not stream.selected:
+        if not stream.enabled or stream.id in failed_imports:
             continue
-        records = [item for item in index.records if item.stream_id == stream.id]
-        targets = _load_targets(state, stream, records)
-        if not targets:
-            targets = prepare_stream_artifacts(
-                state, core, stream, records, generated_at=now
+        try:
+            records = [item for item in index.records if item.stream_id == stream.id]
+            targets = _load_targets(state, stream, records)
+            if not targets:
+                targets = prepare_stream_artifacts(
+                    state, core, stream, records, generated_at=now
+                )
+            if not targets:
+                stream.status = "insufficient-data"
+            else:
+                stream.status = "watching"
+                detections.append(
+                    evaluate_stream(
+                        state, core, config, stream, targets, detected_at=now
+                    )
+                )
+            health.streams[stream.id].status = "healthy"
+            health.streams[stream.id].last_success_at = now
+            health.streams[stream.id].error_code = None
+            health.streams[stream.id].error_message = None
+        except Exception as error:
+            health.streams[stream.id].status = "degraded"
+            health.streams[stream.id].error_code = type(error).__name__
+            health.streams[
+                stream.id
+            ].error_message = (
+                "stream comparison failed; inspect local structural reports"
             )
-        if not targets:
-            stream.status = "insufficient-data"
-            continue
-        stream.status = "watching"
-        detections.append(
-            evaluate_stream(state, core, config, stream, targets, detected_at=now)
-        )
+            errors.append(StreamFailure(stream.id, "compare", type(error).__name__))
+        if checkpoint is not None:
+            checkpoint(f"stream_complete:{stream.id}")
     state.save_config(config)
+    health.updated_at = now
+    health.cycle_completed_at = now
+    state.save_health(health)
     return AttachResult(
         streams=tuple(config.streams),
         traces=len(index.records),
         window_start=start,
         window_end=now,
         detections=tuple(detections),
+        errors=tuple(errors),
     )
 
 

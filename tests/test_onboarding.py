@@ -15,7 +15,7 @@ from maida_heal.state import StateStore
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 
 
-def test_fixture_up_is_complete_tier_one_and_first_report_is_immediate(
+def test_fixture_up_is_complete_shadow_profile_and_first_report_is_immediate(
     tmp_path: Path,
 ) -> None:
     state = StateStore(tmp_path)

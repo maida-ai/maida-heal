@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from maida_heal.killswitch import KillSwitchSyncError, sync_ci_kill_switch
+from maida_heal.killswitch import (
+    KillSwitchSyncError,
+    sync_ci_kill_switch,
+    sync_ci_pause_scope,
+)
 from maida_heal.models import FixesConfig, GateConfig, HealConfig, LangfuseConfig
 from maida_heal.state import (
     StateStore,
@@ -59,7 +63,9 @@ def test_local_lock_is_mirrored_for_gate_and_cleared_together(tmp_path: Path) ->
     assert not mirror.exists()
 
 
-def test_ci_variable_sync_is_tier_gated_and_uses_explicit_repo(tmp_path: Path) -> None:
+def test_ci_variable_sync_is_verify_gated_and_uses_explicit_repo(
+    tmp_path: Path,
+) -> None:
     calls: list[list[str]] = []
 
     def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -78,6 +84,16 @@ def test_ci_variable_sync_is_tier_gated_and_uses_explicit_repo(tmp_path: Path) -
         "true",
         "--repo",
         "maida-ai/example",
+    ]
+    calls.clear()
+    assert (
+        sync_ci_pause_scope(config(tmp_path), scope="fix_dispatch", runner=runner)
+        is True
+    )
+    assert calls[0][3:6] == [
+        "MAIDA_HEAL_PAUSED",
+        "--body",
+        "fix_dispatch",
     ]
 
 

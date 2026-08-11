@@ -22,9 +22,9 @@ The state directory is created with owner-only permissions (`0700`) and includes
 gitignore that excludes everything except itself, so trace data is not staged
 accidentally.
 
-Findings, fixer prompts, PR bodies, closure reports, and command output contain run
-IDs and structural summaries only. They have no raw-payload field. Fix-writer process
-environments also exclude Langfuse credentials.
+Findings, events, webhook bodies, fixer prompts, PR bodies, closure reports, logs, and
+command output contain run IDs and structural summaries only. They have no raw-payload
+field. Fix-writer process environments also exclude Langfuse credentials.
 
 ## Retention and purge
 
@@ -41,8 +41,10 @@ generated policies, and structural reports so the decision history remains usabl
 The command refuses while the kill switch is active; resume deliberately, purge, and
 pause again if emergency data deletion is required.
 
-No telemetry, account, Maida cloud service, or implicit upload is used. Network
-access is limited by tier to the user's Langfuse read API, the selected fix-writer
-provider, and GitHub through the user's `gh` authentication. At tier 3 or 4,
-`pause` and `resume` set the `MAIDA_HEAL_PAUSED` Actions variable so the local kill
-switch also stops or releases the generated remote workflow.
+No telemetry, account, Maida cloud service, license check, or implicit upload is used.
+Network access is limited by profile to the customer's Langfuse read API, configured
+webhook endpoints, the selected fix-writer provider, and GitHub through the customer's
+`gh` authentication. In `verify` and `full`, `pause` and `resume` set the
+`MAIDA_HEAL_PAUSED` Actions variable so the local kill switch also stops or releases
+the generated remote workflow. Recurrence uses the scoped value `fix_dispatch`, so
+verification may finish while fix dispatch and automatic merge stay paused.

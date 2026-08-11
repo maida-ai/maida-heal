@@ -1,0 +1,740 @@
+{
+  "$defs": {
+    "ClosureCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Detail",
+          "type": "string"
+        },
+        "evidence_pointers": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Pointers",
+          "type": "array"
+        },
+        "name": {
+          "enum": [
+            "specific_metrics",
+            "holdouts",
+            "no_new_failures"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "passed",
+        "evidence_pointers",
+        "detail"
+      ],
+      "title": "ClosureCondition",
+      "type": "object"
+    },
+    "ClosureReport": {
+      "additionalProperties": false,
+      "properties": {
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/ClosureCondition"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Conditions",
+          "type": "array"
+        },
+        "finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "maida_report_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Maida Report Version",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "closed",
+            "rejected"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "maida_report_version",
+        "verdict",
+        "conditions"
+      ],
+      "title": "ClosureReport",
+      "type": "object"
+    },
+    "EventType": {
+      "enum": [
+        "finding.opened",
+        "finding.evidence_added",
+        "fix.proposed",
+        "fix.rejected",
+        "fix.verified",
+        "fix.expired",
+        "loop.paused",
+        "loop.resumed",
+        "rollback.opened"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "FindingEvidenceAddedEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_pointers": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Pointers",
+          "type": "array"
+        },
+        "finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "metrics": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Metrics",
+          "type": "array"
+        },
+        "run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Run Ids",
+          "type": "array"
+        },
+        "stream_id": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Stream Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "stream_id",
+        "metrics",
+        "evidence_pointers"
+      ],
+      "title": "FindingEvidenceAddedEventData",
+      "type": "object"
+    },
+    "FindingOpenedEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_pointers": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Pointers",
+          "type": "array"
+        },
+        "finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "metrics": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Metrics",
+          "type": "array"
+        },
+        "run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Run Ids",
+          "type": "array"
+        },
+        "source": {
+          "$ref": "#/$defs/FindingSource"
+        },
+        "stream": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Stream",
+          "type": "string"
+        },
+        "stream_id": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Stream Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "stream",
+        "stream_id",
+        "source",
+        "metrics",
+        "evidence_pointers"
+      ],
+      "title": "FindingOpenedEventData",
+      "type": "object"
+    },
+    "FindingSource": {
+      "enum": [
+        "shadow_watch",
+        "demo",
+        "post_merge_watch"
+      ],
+      "title": "FindingSource",
+      "type": "string"
+    },
+    "FixExpiredEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "minimum": 0,
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "reason",
+        "attempts"
+      ],
+      "title": "FixExpiredEventData",
+      "type": "object"
+    },
+    "FixProposedEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "branch": {
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        },
+        "changed_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Changed Paths",
+          "type": "array"
+        },
+        "diff_lines": {
+          "minimum": 0,
+          "title": "Diff Lines",
+          "type": "integer"
+        },
+        "finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "pull_request_number": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pull Request Number"
+        },
+        "pull_request_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pull Request Url"
+        }
+      },
+      "required": [
+        "finding_id",
+        "attempt",
+        "branch",
+        "diff_lines"
+      ],
+      "title": "FixProposedEventData",
+      "type": "object"
+    },
+    "FixRejectedEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attempt"
+        },
+        "changed_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Changed Paths",
+          "type": "array"
+        },
+        "finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "reason"
+      ],
+      "title": "FixRejectedEventData",
+      "type": "object"
+    },
+    "FixVerifiedEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "closure_report": {
+          "$ref": "#/$defs/ClosureReport"
+        },
+        "finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "pull_request_number": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pull Request Number"
+        },
+        "release_mode": {
+          "enum": [
+            "verify_only",
+            "handoff",
+            "auto_merge"
+          ],
+          "title": "Release Mode",
+          "type": "string"
+        },
+        "release_ready": {
+          "title": "Release Ready",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "finding_id",
+        "release_mode",
+        "release_ready",
+        "closure_report"
+      ],
+      "title": "FixVerifiedEventData",
+      "type": "object"
+    },
+    "LoopStateEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Actor",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "scope": {
+          "default": "all",
+          "enum": [
+            "all",
+            "fix_dispatch"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor"
+      ],
+      "title": "LoopStateEventData",
+      "type": "object"
+    },
+    "RollbackOpenedEventData": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        },
+        "finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "prior_finding_id": {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "title": "Prior Finding Id",
+          "type": "string"
+        },
+        "pull_request_url": {
+          "minLength": 1,
+          "title": "Pull Request Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "prior_finding_id",
+        "pull_request_url",
+        "branch"
+      ],
+      "title": "RollbackOpenedEventData",
+      "type": "object"
+    }
+  },
+  "$id": "https://maida.ai/schemas/maida-heal/event/1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "finding.opened"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FindingOpenedEventData"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "finding.evidence_added"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FindingEvidenceAddedEventData"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "fix.proposed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FixProposedEventData"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "fix.rejected"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FixRejectedEventData"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "fix.verified"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FixVerifiedEventData"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "fix.expired"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FixExpiredEventData"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "loop.paused"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/LoopStateEventData"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "loop.resumed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/LoopStateEventData"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "rollback.opened"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/RollbackOpenedEventData"
+          }
+        }
+      }
+    }
+  ],
+  "description": "Stable machine-facing event contract with payload-free typed data.",
+  "properties": {
+    "data": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FindingOpenedEventData"
+        },
+        {
+          "$ref": "#/$defs/FindingEvidenceAddedEventData"
+        },
+        {
+          "$ref": "#/$defs/FixProposedEventData"
+        },
+        {
+          "$ref": "#/$defs/FixRejectedEventData"
+        },
+        {
+          "$ref": "#/$defs/FixVerifiedEventData"
+        },
+        {
+          "$ref": "#/$defs/FixExpiredEventData"
+        },
+        {
+          "$ref": "#/$defs/LoopStateEventData"
+        },
+        {
+          "$ref": "#/$defs/RollbackOpenedEventData"
+        }
+      ],
+      "title": "Data"
+    },
+    "event_id": {
+      "pattern": "^evt_[0-9a-f]{32}$",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "finding_id": {
+      "anyOf": [
+        {
+          "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finding Id"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stream_id": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stream Id"
+    },
+    "type": {
+      "$ref": "#/$defs/EventType"
+    }
+  },
+  "required": [
+    "event_id",
+    "type",
+    "occurred_at",
+    "data"
+  ],
+  "title": "EventEnvelope",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

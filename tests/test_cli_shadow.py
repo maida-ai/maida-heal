@@ -1,3 +1,5 @@
+"""CLI coverage for the independently useful shadow profile."""
+
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,7 +8,7 @@ from pytest import MonkeyPatch
 from typer.testing import CliRunner, Result
 
 from maida_heal.cli import app
-from maida_heal.models import FixesConfig
+from maida_heal.models import FixesConfig, LoopMode
 from maida_heal.state import StateStore
 
 runner = CliRunner()
@@ -18,20 +20,21 @@ FIXTURE_ENV = {
 
 def attach(tmp_path: Path, monkeypatch: MonkeyPatch) -> Result:
     monkeypatch.chdir(tmp_path)
-    result = runner.invoke(app, ["up", "--yes"], env=FIXTURE_ENV)
+    result = runner.invoke(app, ["up"], env=FIXTURE_ENV)
     assert result.exit_code == 0, result.output
     return result
 
 
-def test_up_tells_complete_shadow_story_and_names_one_next_step(
+def test_up_writes_headless_shadow_profile_and_immediate_report(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     result = attach(tmp_path, monkeypatch)
 
-    assert "FIRST REPORT" in result.stdout
-    assert "19 traces" in result.stdout
-    assert "Attach" not in result.stdout
-    assert "`maida-heal enable fixes`" in result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["mode"] == "shadow"
+    assert payload["traces"] == 19
+    assert payload["streams"] == 1
+    assert payload["reports"][0]["verdict"] == "fail"
     assert "Connect —" in result.stderr
     assert "Report —" in result.stderr
     assert (tmp_path / ".maida-heal" / "config.yaml").is_file()
@@ -42,11 +45,11 @@ def test_status_findings_pause_resume_watch_and_purge(
 ) -> None:
     attach(tmp_path, monkeypatch)
 
-    status = runner.invoke(app, ["status"], env=FIXTURE_ENV)
+    status = runner.invoke(app, ["status", "--json"], env=FIXTURE_ENV)
     assert status.exit_code == 0
-    assert "Tier: 1" in status.stdout
-    assert "Autonomous: findings only" in status.stdout
-    assert "Next step: maida-heal enable fixes" in status.stdout
+    status_payload = json.loads(status.stdout)
+    assert status_payload["mode"] == "shadow"
+    assert status_payload["autonomy"]["propose"] is False
 
     listed = runner.invoke(app, ["findings", "list"], env=FIXTURE_ENV)
     assert listed.exit_code == 0
@@ -58,7 +61,7 @@ def test_status_findings_pause_resume_watch_and_purge(
 
     paused = runner.invoke(app, ["pause"], env=FIXTURE_ENV)
     assert paused.exit_code == 0
-    repeated_up = runner.invoke(app, ["up", "--yes"], env=FIXTURE_ENV)
+    repeated_up = runner.invoke(app, ["up"], env=FIXTURE_ENV)
     assert repeated_up.exit_code == 2
     purge_while_paused = runner.invoke(app, ["purge"], env=FIXTURE_ENV)
     assert purge_while_paused.exit_code == 2
@@ -67,6 +70,12 @@ def test_status_findings_pause_resume_watch_and_purge(
     assert "is paused" in watch.stderr
     resumed = runner.invoke(app, ["resume"], env=FIXTURE_ENV)
     assert resumed.exit_code == 0
+    event_types = [
+        json.loads(line)["type"]
+        for line in (tmp_path / ".maida-heal" / "events.jsonl").read_text().splitlines()
+    ]
+    assert "loop.paused" in event_types
+    assert "loop.resumed" in event_types
     watch = runner.invoke(app, ["watch", "--once"], env=FIXTURE_ENV)
     assert watch.exit_code == 0, watch.output
 
@@ -86,7 +95,29 @@ def test_fix_refuses_cleanly_while_only_shadow_mode_is_enabled(
     result = runner.invoke(app, ["fix", finding_id, "--dry-run"], env=FIXTURE_ENV)
 
     assert result.exit_code == 2
-    assert "Fixes are not enabled" in result.stderr
+    assert "Fixes are not configured" in result.stderr
+
+
+def test_interval_watch_stays_idle_while_manual_kill_switch_is_active(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    attach(tmp_path, monkeypatch)
+    assert runner.invoke(app, ["pause"], env=FIXTURE_ENV).exit_code == 0
+
+    class StopLoop(RuntimeError):
+        pass
+
+    def stop_after_interval(seconds: float) -> None:
+        assert seconds == 1
+        raise StopLoop
+
+    monkeypatch.setattr("maida_heal.cli.time.sleep", stop_after_interval)
+    result = runner.invoke(app, ["watch", "--interval", "1"], env=FIXTURE_ENV)
+
+    assert isinstance(result.exception, StopLoop)
+    assert json.loads(result.stdout)["status"] == "paused"
+    records = [json.loads(line) for line in result.stderr.splitlines() if line]
+    assert [item["event"] for item in records] == ["watch.paused"]
 
 
 def test_watch_dispatches_new_findings_only_when_auto_propose_is_enabled(
@@ -102,6 +133,7 @@ def test_watch_dispatches_new_findings_only_when_auto_propose_is_enabled(
         command=["fixture-fixer"],
         auto_propose=True,
     )
+    config.mode = LoopMode.PROPOSE
     state.save_config(config)
     for path in state.local_findings_dir.glob("mh-*.json"):
         path.unlink()

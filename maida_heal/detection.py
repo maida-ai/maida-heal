@@ -176,7 +176,12 @@ def persist_failures(
         existing = _open_match(findings, stream_id=stream.id, metric=failure.metric)
         if existing is not None:
             current = existing.metric_failures[0]
-            current.run_ids = list(dict.fromkeys([*current.run_ids, *failure.run_ids]))
+            new_run_ids = [
+                run_id for run_id in failure.run_ids if run_id not in current.run_ids
+            ]
+            if not new_run_ids:
+                continue
+            current.run_ids = [*current.run_ids, *new_run_ids]
             current.evidence_pointer = failure.evidence_pointer
             current.observed = failure.observed
             current.prediction_bound = failure.prediction_bound

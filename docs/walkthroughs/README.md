@@ -1,12 +1,14 @@
-# Tier walkthroughs
+# Headless walkthroughs
 
-Each walkthrough starts from the tier below and ends at one independently useful
-state. Tier 0 and the fixture form of tier 1 are executed directly by the test suite.
-Tiers 2 through 4 are exercised through offline fakes in their linked tests because
-the real commands intentionally use the operator's git repository and `gh` session.
+Each walkthrough starts with configuration, states the unattended behavior, and names
+the event customer automation receives. Nothing reads from a TTY.
 
-- [Tier 0: prove it](tier-0-demo.md)
-- [Tier 1: attach and watch](tier-1-shadow.md)
-- [Tier 2: propose fixes](tier-2-fixes.md)
-- [Tier 3: deterministic closure](tier-3-gate.md)
-- [Tier 4: bounded release](tier-4-release.md)
+- [Offline automated demo](demo.md)
+- [Shadow: detect and emit](shadow.md)
+- [Propose: dispatch a bounded writer](propose.md)
+- [Verify: deterministic closure](verify.md)
+- [Full: release handoff](full.md)
+
+[`headless.sh`](headless.sh) is an executable fixture walkthrough: config is generated,
+one watch cycle runs, status is scraped, and the JSONL event API is asserted without a
+network or terminal. The test suite executes it with stdin closed.

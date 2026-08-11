@@ -20,11 +20,11 @@ not.
 
 ## Holdout construction
 
-When tier 3 is enabled, a stable SHA-256 ordering chooses the configured fraction of
-each baseline sample (default `0.25`). Those run IDs move to
+When the `verify` profile is applied, a stable SHA-256 ordering chooses the configured
+fraction of each baseline sample (default `0.25`). Those run IDs move to
 `.maida/holdout/<stream>/<target>/manifest.json`; they are removed before Maida
 extracts the promoted training baseline. A target must still retain the pinned
-verifier's minimum training sample after the split or gate enablement refuses.
+verifier's minimum training sample after the split or config application refuses.
 
 Holdout manifests contain IDs, target identity, and `payloads_included: false`.
 Their scenarios are run by the connected repository's holdout command. Holdouts are
@@ -40,3 +40,9 @@ trace payloads.
 For a drift-sourced finding, CI replays repository scenarios; it does not replay live
 production traffic. The post-merge watch window is the true production confirmation.
 A production-replay canary is outside this experiment.
+
+In `verify` mode, a successful report emits `fix.verified` with
+`release_mode: verify_only` and `release_ready: false`. In `full` mode, the same
+deterministic report is embedded in a release-ready event. Handoff then stops;
+customer automation owns merge and deployment. No release mode changes the closure
+rule.

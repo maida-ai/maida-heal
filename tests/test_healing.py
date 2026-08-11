@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
@@ -6,19 +7,29 @@ from pathlib import Path
 import pytest
 
 from maida_heal.fixers import Fixer
-from maida_heal.healing import Publisher, PullRequest, propose_fix
+from maida_heal.gitops import commit_fix, create_worktree
+from maida_heal.healing import (
+    Publisher,
+    PullRequest,
+    expire_exhausted_finding,
+    propose_fix,
+)
 from maida_heal.models import (
     Actor,
     Finding,
     FindingSource,
     FindingStatus,
+    FixAttempt,
     FixesConfig,
+    GateConfig,
     HealConfig,
     HistoryEvent,
     LangfuseConfig,
+    LoopMode,
     MetricFailure,
+    StreamConfig,
 )
-from maida_heal.state import StateStore
+from maida_heal.state import StateError, StateStore
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 
@@ -85,6 +96,7 @@ def make_config(
     cooldown_hours: int = 0,
 ) -> HealConfig:
     return HealConfig(
+        mode=LoopMode.PROPOSE,
         langfuse=LangfuseConfig(
             host="https://example.test", credential_source="environment"
         ),
@@ -97,6 +109,50 @@ def make_config(
             cooldown_hours=cooldown_hours,
         ),
     )
+
+
+def test_fix_refuses_when_profile_or_stream_does_not_authorize_proposals(
+    tmp_path: Path,
+) -> None:
+    repo = make_repo(tmp_path / "repo")
+    state = StateStore(tmp_path / "control")
+    config = make_config(repo)
+    config.mode = LoopMode.SHADOW
+    state.save_config(config)
+    finding = make_finding(state, config)
+
+    with pytest.raises(StateError, match="configured for shadow"):
+        propose_fix(
+            state,
+            config,
+            finding.id,
+            now=NOW,
+            dry_run=True,
+            fixer=EditingFixer("prompts/agent.md", "retries: 1\n"),
+        )
+
+    config.mode = LoopMode.PROPOSE
+    config.streams = [
+        StreamConfig(
+            id=finding.stream_id,
+            name=finding.stream,
+            grouping="trace_name",
+            grouping_key="traceName",
+            grouping_value_hash="aabbccddeeff",
+            trace_names=["support-agent"],
+            mode=LoopMode.SHADOW,
+        )
+    ]
+    state.save_config(config)
+    with pytest.raises(StateError, match="configured for shadow"):
+        propose_fix(
+            state,
+            config,
+            finding.id,
+            now=NOW,
+            dry_run=True,
+            fixer=EditingFixer("prompts/agent.md", "retries: 1\n"),
+        )
 
 
 class EditingFixer(Fixer):
@@ -156,6 +212,64 @@ class FakePublisher(Publisher):
         return PullRequest(17, "https://github.com/maida-ai/example-agent/pull/17")
 
 
+class RecoveredPublisher(Publisher):
+    def __init__(self) -> None:
+        self.publish_calls = 0
+
+    def find_existing(
+        self, branch: str, *, repository: str, repo: Path
+    ) -> PullRequest | None:
+        del repo
+        assert branch == "maida-heal/mh-20260811-0123456789-a1"
+        assert repository == "maida-ai/example-agent"
+        return PullRequest(23, "https://github.com/maida-ai/example-agent/pull/23")
+
+    def publish(
+        self,
+        worktree: object,
+        finding: Finding,
+        *,
+        repository: str,
+        body: str,
+    ) -> PullRequest:
+        del worktree, finding, repository, body
+        self.publish_calls += 1
+        raise AssertionError("recovered PR must not be published twice")
+
+
+class PendingPublisher(Publisher):
+    def __init__(self) -> None:
+        self.publish_calls = 0
+
+    def find_existing(
+        self, branch: str, *, repository: str, repo: Path
+    ) -> PullRequest | None:
+        del branch, repository, repo
+        return None
+
+    def publish(
+        self,
+        worktree: object,
+        finding: Finding,
+        *,
+        repository: str,
+        body: str,
+    ) -> PullRequest:
+        del worktree, finding, repository, body
+        self.publish_calls += 1
+        return PullRequest(29, "https://github.com/maida-ai/example-agent/pull/29")
+
+
+class ExplodingFixer(Fixer):
+    kind = "command"
+
+    def write(
+        self, worktree: Path, prompt: str, *, environment: Mapping[str, str]
+    ) -> None:
+        del worktree, prompt, environment
+        raise AssertionError("a committed claimed patch must not invoke another writer")
+
+
 def test_protected_path_is_rejected_post_hoc_and_branch_is_deleted(
     tmp_path: Path,
 ) -> None:
@@ -213,6 +327,43 @@ def test_allowed_patch_is_committed_with_trailer_and_opens_pr(
     stored = state.load_finding(finding.id, config)
     assert stored.status is FindingStatus.FIX_PROPOSED
     assert stored.attempts[0].pull_request_number == 17
+
+
+def test_lower_stream_mode_keeps_fix_pr_honest_when_global_gate_exists(
+    tmp_path: Path,
+) -> None:
+    repo = make_repo(tmp_path / "repo")
+    state = StateStore(tmp_path / "control")
+    config = make_config(repo)
+    config.gate = GateConfig(command=["fixture", "{report}"])
+    config.mode = LoopMode.VERIFY
+    config.streams = [
+        StreamConfig(
+            id="support-agent-aabbccdd",
+            name="support-agent",
+            grouping="trace_name",
+            grouping_key="traceName",
+            grouping_value_hash="aabbccddeeff",
+            trace_names=["support-agent"],
+            mode=LoopMode.PROPOSE,
+        )
+    ]
+    state.save_config(config)
+    finding = make_finding(state, config)
+    publisher = FakePublisher()
+
+    result = propose_fix(
+        state,
+        config,
+        finding.id,
+        now=NOW,
+        dry_run=False,
+        fixer=EditingFixer("prompts/agent.md", "retries: 1\n"),
+        publisher=publisher,
+    )
+
+    assert result.outcome == "proposed"
+    assert "gate not enabled -- review manually" in publisher.bodies[0]
 
 
 def test_dry_run_leaves_finding_and_branches_unchanged(tmp_path: Path) -> None:
@@ -364,3 +515,170 @@ def test_renaming_a_protected_file_into_allowlist_is_still_rejected(
         ".maida/policy.yaml",
         "prompts/renamed-policy.md",
     }
+
+
+def test_forced_kill_after_attempt_claim_never_double_dispatches(
+    tmp_path: Path,
+) -> None:
+    repo = make_repo(tmp_path / "repo")
+    state = StateStore(tmp_path / "control")
+    config = make_config(repo)
+    state.save_config(config)
+    finding = make_finding(state, config)
+    script = """
+import os
+import signal
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from maida_heal.healing import propose_fix
+from maida_heal.state import StateStore
+state = StateStore(Path(sys.argv[1]))
+config = state.load_config()
+def checkpoint(name):
+    if name == 'attempt_claimed':
+        os.kill(os.getpid(), signal.SIGKILL)
+propose_fix(
+    state,
+    config,
+    sys.argv[2],
+    now=datetime(2026, 8, 11, 12, tzinfo=timezone.utc),
+    dry_run=False,
+    checkpoint=checkpoint,
+)
+"""
+
+    killed = subprocess.run(
+        [sys.executable, "-c", script, str(state.project_root), finding.id],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert killed.returncode == -9
+    claimed = state.load_finding(finding.id, config)
+    assert len(claimed.attempts) == 1
+    assert claimed.attempts[0].outcome == "running"
+    with pytest.raises(ValueError, match="refusing duplicate fix dispatch"):
+        propose_fix(
+            state,
+            config,
+            finding.id,
+            now=NOW,
+            dry_run=False,
+            fixer=EditingFixer("prompts/agent.md", "retries: 1\n"),
+            publisher=FakePublisher(),
+        )
+    assert len(state.load_finding(finding.id, config).attempts) == 1
+
+
+def test_restart_reconciles_existing_pr_without_invoking_a_second_writer(
+    tmp_path: Path,
+) -> None:
+    repo = make_repo(tmp_path / "repo")
+    state = StateStore(tmp_path / "control")
+    config = make_config(repo)
+    state.save_config(config)
+    finding = make_finding(state, config)
+    finding.attempts.append(
+        FixAttempt(
+            number=1,
+            fixer="command",
+            branch=f"maida-heal/{finding.id}-a1",
+            started_at=NOW,
+            outcome="running",
+        )
+    )
+    state.save_finding(finding, config)
+    publisher = RecoveredPublisher()
+
+    result = propose_fix(
+        state,
+        config,
+        finding.id,
+        now=NOW,
+        dry_run=False,
+        fixer=EditingFixer("prompts/agent.md", "must-not-run\n"),
+        publisher=publisher,
+    )
+
+    assert result.outcome == "proposed"
+    assert result.pull_request and result.pull_request.number == 23
+    assert publisher.publish_calls == 0
+    stored = state.load_finding(finding.id, config)
+    assert stored.status is FindingStatus.FIX_PROPOSED
+    assert len(stored.attempts) == 1
+    assert stored.attempts[0].pull_request_number == 23
+
+
+def test_restart_resumes_committed_claim_at_publication_without_rewriting(
+    tmp_path: Path,
+) -> None:
+    repo = make_repo(tmp_path / "repo")
+    state = StateStore(tmp_path / "control")
+    config = make_config(repo)
+    state.save_config(config)
+    finding = make_finding(state, config)
+    branch = f"maida-heal/{finding.id}-a1"
+    finding.attempts.append(
+        FixAttempt(
+            number=1,
+            fixer="command",
+            branch=branch,
+            started_at=NOW,
+            outcome="running",
+        )
+    )
+    state.save_finding(finding, config)
+    worktree = create_worktree(
+        repo, state.root / "worktrees" / f"{finding.id}-a1", branch
+    )
+    (worktree.path / "prompts" / "agent.md").write_text(
+        "retries: 1\n", encoding="utf-8"
+    )
+    commit_fix(worktree, finding.id, finding.title)
+    committed_head = git(worktree.path, "rev-parse", "HEAD")
+    publisher = PendingPublisher()
+
+    result = propose_fix(
+        state,
+        config,
+        finding.id,
+        now=NOW,
+        dry_run=False,
+        fixer=ExplodingFixer(),
+        publisher=publisher,
+    )
+
+    assert result.outcome == "proposed"
+    assert result.inspection.changed_paths == ("prompts/agent.md",)
+    assert result.pull_request and result.pull_request.number == 29
+    assert publisher.publish_calls == 1
+    assert git(repo, "rev-parse", branch) == committed_head
+    assert len(state.load_finding(finding.id, config).attempts) == 1
+
+
+def test_running_claim_is_not_expired_but_spent_rejection_emits_expiry(
+    tmp_path: Path,
+) -> None:
+    repo = make_repo(tmp_path / "repo")
+    state = StateStore(tmp_path / "control")
+    config = make_config(repo, attempts=1)
+    state.save_config(config)
+    finding = make_finding(state, config)
+    finding.attempts.append(
+        FixAttempt(
+            number=1,
+            fixer="command",
+            branch=f"maida-heal/{finding.id}-a1",
+            started_at=NOW,
+            outcome="running",
+        )
+    )
+
+    assert expire_exhausted_finding(state, config, finding, now=NOW) is False
+    finding.attempts[-1].outcome = "rejected"
+    assert expire_exhausted_finding(state, config, finding, now=NOW) is True
+    assert state.load_finding(finding.id, config).status is FindingStatus.EXPIRED
+    outbox = state.root / "events" / "outbox"
+    assert any('"type": "fix.expired"' in path.read_text() for path in outbox.iterdir())

@@ -86,7 +86,7 @@ def test_real_maida_drift_creates_and_deduplicates_step_regression(
         state, core, selected_config, selected, targets, detected_at=NOW
     )
     assert repeated.findings_created == ()
-    assert repeated.findings_updated
+    assert repeated.findings_updated == ()
     assert len(state.list_findings(selected_config)) == len(findings)
 
 

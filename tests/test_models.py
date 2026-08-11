@@ -12,6 +12,7 @@ from maida_heal.models import (
     HealConfig,
     HistoryEvent,
     LangfuseConfig,
+    LoopMode,
     MetricFailure,
 )
 from maida_heal.state import StateError, StateStore
@@ -94,19 +95,20 @@ def test_finding_models_forbid_unknown_fields_and_naive_timestamps() -> None:
         Finding.model_validate(payload)
 
 
-def test_progressive_config_enforces_tier_order() -> None:
-    tier_one = HealConfig(
+def test_config_enforces_profile_order() -> None:
+    shadow = HealConfig(
         langfuse=LangfuseConfig(
             host="https://example.langfuse.test",
             credential_source="environment",
         )
     )
-    assert tier_one.tier == 1
+    assert shadow.mode is LoopMode.SHADOW
 
-    with pytest.raises(ValidationError, match="gate requires fixes"):
+    with pytest.raises(ValidationError, match="propose mode requires fixes"):
         HealConfig.model_validate(
             {
-                "schema_version": "1.0.0",
+                "schema_version": "2.0.0",
+                "mode": "verify",
                 "gate": {
                     "command": ["./verify"],
                     "holdout_fraction": 0.25,

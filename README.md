@@ -1,119 +1,153 @@
 # maida-heal
 
-> Experimental reference implementation. Interfaces and schemas may change before
-> the first stable release.
+> Experimental. The package and its machine contracts may change before the first
+> stable release.
 
-`maida-heal` attaches a self-healing loop to agents that already produce Langfuse
-traces. Maida remains the pre-merge behavioral regression gate. This separate
-project uses versioned Maida reports as the deterministic verification primitive
-around a replaceable fix writer.
+`maida-heal` runs an unattended self-healing loop around agents that already emit
+Langfuse traces. Maida remains the pre-merge behavioral regression gate and the only
+verifier. A replaceable fix writer proposes code; customer-owned automation decides
+when and how verified code is released.
 
-## Prove the loop locally
+```text
+Customer AI loop
+      |
+      v
+Langfuse traces --read only--> Maida catch --> finding.opened
+                                          |
+                                          v
+                                  replaceable fix writer
+                                          |
+                                          v
+                                 pull request + Maida gate
+                                          |
+                                          v
+                            fix.verified  <--- HANDOFF
+                                          |
+                                          v
+                          customer release automation --> deploy
+                                                       --> Customer AI loop
+```
+
+Maida stops at the marked handoff by default. It does not sit in the customer's
+deployment path.
+
+## Run the automated story offline
 
 ```bash
 pip install maida-heal
 maida-heal demo
 ```
 
-The demo is offline, deterministic, and needs no keys. It imports bundled structural
-trace fixtures, detects a real behavioral regression with Maida, applies a canned
-patch through the `command` fixer, runs the real Maida gate and holdouts, and emits a
-versioned closure report. It never contacts Langfuse, GitHub, or an LLM provider.
+The deterministic demo needs no keys and makes no network calls. It imports bundled
+structural traces, detects a real regression, runs the `command` fix writer, verifies
+the exact finding plus holdouts, shows each JSON event handoff, and finishes with a
+`fix.verified` event and PR-comment preview. It never merges or deploys.
 
-## Unlock one tier at a time
-
-### 1. Attach and watch
-
-```bash
-maida-heal up
-```
+## Bootstrap a shadow profile
 
 `up` reuses the standard `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and
-`LANGFUSE_HOST` or `LANGFUSE_BASE_URL` variables already used by Langfuse SDKs. It
-discovers agent streams, imports a bounded absolute-time window through
-`maida import langfuse`, creates conservative starter policies, and prints the first
-drift report immediately.
-
-This tier is shadow mode. It creates findings, but it never edits code, calls an LLM,
-blocks a merge, opens a pull request, or changes Langfuse data.
-
-### 2. Propose fixes
+`LANGFUSE_HOST` or `LANGFUSE_BASE_URL` environment variables. It has no interactive
+path.
 
 ```bash
-maida-heal enable fixes
+maida-heal up --plan  # discover defaults and print intended writes
+maida-heal up         # write config, streams, policies, and the first report
 ```
 
-Connect the git repository that controls agent behavior and choose Claude Code, the
-Anthropic API, or a user-supplied command as the fix writer. A finding can then
-produce a branch and pull request:
+The generated `.maida-heal/config.yaml` is the front door. Stream curation happens
+there: set `enabled`, rename `name`, combine `selectors`, choose a lower per-stream
+`mode`, or override generated envelopes. `up` never changes Langfuse data.
+
+## Configuration profiles
+
+One top-level key controls the loop shape:
+
+```yaml
+schema_version: 2.0.0
+mode: shadow
+```
+
+| Profile | Runs unattended | Does not do |
+| --- | --- | --- |
+| `shadow` | Imports, compares, and emits findings | Call a fix writer or touch git |
+| `propose` | Adds automatic fix dispatch and pull requests | Claim behavioral closure or merge |
+| `verify` | Adds the unchanged Maida gate, holdouts, and closure | Mark a patch release-ready or merge |
+| `full` | Emits release-ready `fix.verified` handoff events | Merge unless `auto_merge` is separately configured |
+
+Add the section required by a profile, change `mode`, then validate and apply it:
 
 ```bash
-maida-heal fix mh-20260811-0123456789
+maida-heal config validate
+maida-heal config apply
 ```
 
-At this tier every fix waits for human review. A post-hoc diff check rejects protected
-or out-of-allowlist edits independently of the chosen fix writer.
+`config apply` checks the configured git/`gh`/writer prerequisites and, for
+`verify` or `full`, synchronizes the reviewed `.maida/` artifacts and generated
+workflow into the connected repository. There are no `enable` or `disable` command
+flows; rolling forward or back is an auditable config diff.
 
-### 3. Verify in CI
+`full` requires an explicit authorization artifact:
 
-```bash
-maida-heal enable gate
+```yaml
+activation:
+  acknowledged_by: "Operator Name <operator@example.com>"
+  date: 2026-08-11
+  statement: autonomous-fix-loop-authorized
 ```
 
-This promotes reviewed policy artifacts, creates a private holdout split, and
-scaffolds `.github/workflows/maida-heal.yml` in the connected repository. Closure
-requires the finding's exact metric to recover, every holdout to pass, and no new
-Maida failure anywhere.
+Without this exact block, config loading fails before work begins.
 
-For findings detected from production drift, CI replays repository scenarios. Live
-production confirmation happens only in the post-merge watch window.
+## Events are the API
 
-This tier never changes policy to make a patch pass. It does not merge a pull request.
+Every state change is a semver'd JSON event. Local JSONL is always active; webhook
+and GitHub surfaces can be added together:
 
-### 4. Close the loop
-
-```bash
-maida-heal enable auto-merge
+```yaml
+events:
+  sinks:
+    - kind: jsonl
+      path: .maida-heal/events.jsonl
+    - kind: webhook
+      url: https://automation.example.com/maida-heal
+      secret_env: MAIDA_HEAL_WEBHOOK_SECRET
+    - kind: github
 ```
 
-This command refuses until the gate is active and a verified finding has already
-been merged by a human. Automatic merge is bounded by finding closure, a fresh PR
-diff/path check, diff size, a daily budget, and the kill switch. A recurrence after an
-automatic merge opens a revert pull request and pauses automatic merge; the revert
-is never merged automatically.
+Webhook bodies are signed with HMAC-SHA256 using the named environment variable.
+Delivery is bounded and non-blocking. Events use stable IDs and at-least-once
+delivery, so consumers deduplicate by `event_id`. See the complete contract in
+[docs/events.md](docs/events.md).
 
-Stop all mutations at any time:
+## Handoff first; automatic merge optional
 
-```bash
-maida-heal pause
-```
+The recommended `full` profile omits `auto_merge`. On closure, Maida-heal marks the
+PR verified, emits `fix.verified` with the closure report, and stops. Customer
+automation owns merge and deployment.
 
-At tier 3 or 4, the command also mirrors the lock into the connected repository and
-sets its `MAIDA_HEAL_PAUSED` GitHub Actions variable through the user's existing
-`gh` authentication. `resume` clears the local mirrors and sets that variable false.
+Adding `auto_merge` is a separate, narrower opt-in. It still requires the `full`
+attestation and enforces exact closure, protected paths, a diff cap, a daily budget,
+and the kill switch. A matching post-merge recurrence opens a revert PR and pauses
+fix dispatch. Revert PRs are never merged automatically.
 
-## The boundary
+## Load-bearing boundaries
 
 - The verifier never uses an LLM. Maida alone produces behavioral verdicts.
-- The fix writer is replaceable. It can write a patch; it cannot judge that patch.
-- Nothing merges automatically unless tier 4 is explicitly enabled.
-- No Maida cloud, accounts, or telemetry are used.
-- Langfuse access is read-only. Imported data stays under `.maida-heal/`.
-- Raw trace payloads are excluded from findings, fixer prompts, pull request bodies,
-  and logs. `maida-heal purge` removes imported trace data.
+- The fix writer is replaceable. It writes a candidate; it never judges it.
+- Post-hoc path enforcement is authoritative regardless of writer restrictions.
+- Handoff mode never merges. Automatic merge is a separate attested config choice.
+- No Maida cloud, account, license check, usage reporting, or telemetry is used.
+- Langfuse imports are read-only.
+- Trace payloads never enter findings, events, writer prompts, PR bodies, or logs.
+- Imported data stays under `.maida-heal/`; `maida-heal purge` removes it.
 
-Use `maida-heal status` to see the active tier, autonomous actions, limits, and the
-single next enable step.
-
-## Commands
+## Operator commands
 
 ```text
 maida-heal demo
-maida-heal up [--yes]
-maida-heal enable fixes|gate|auto-merge
-maida-heal disable fixes|gate|auto-merge
-maida-heal status
+maida-heal up [--plan] [--metadata-key KEY]
+maida-heal config validate|apply
 maida-heal watch [--once|--interval SECONDS]
+maida-heal status [--json]
 maida-heal findings list
 maida-heal findings show FINDING_ID
 maida-heal fix FINDING_ID [--dry-run] [--fixer claude-code|api|command]
@@ -123,19 +157,21 @@ maida-heal resume
 maida-heal purge
 ```
 
-`up` and `enable` may ask questions only in a TTY. Watch, fix, verify, and CI paths
-never prompt. Progress is written to stderr; requested text or JSON is written to
-stdout. Exit codes match Maida: `0` success, `1` gate or closure failure, `2` missing
-or invalid input, and `10` internal failure.
+No command prompts. `watch --interval` is the production workhorse; it writes JSON
+logs to stderr and structured requested output to stdout. `status --json` is the
+stable health surface. Exit codes match Maida: `0` success, `1` gate or closure
+failure, `2` missing/invalid input, and `10` internal failure.
 
 ## Design and data contracts
 
-- [Closure and holdouts](docs/closure.md)
+- [Event contract](docs/events.md)
+- [Deployment and kill-switch runbook](docs/deploy.md)
+- [Configuration reference](docs/configuration.md)
+- [Finding closure and holdouts](docs/closure.md)
 - [Data handling and retention](docs/data-handling.md)
 - [Architecture](docs/architecture.md)
-- [Full configuration reference](docs/configuration.md)
+- [Headless walkthroughs](docs/walkthroughs/README.md)
 - [Versioned schemas](schemas/README.md)
-- [Tier walkthroughs](docs/walkthroughs/README.md)
 
 ## Development
 
@@ -148,6 +184,6 @@ uv run ruff format --check .
 uv run mypy .
 ```
 
-The dependency on `maida-ai==0.5.0` is exact. `maida-heal` consumes only the public
-CLI, documented exit codes, and semver'd report JSON; it does not import verifier
-internals or modify the core package.
+The dependency on `maida-ai==0.5.0` is exact. `maida-heal` consumes only public
+commands, documented exit codes, public local-run commands, and semver'd report JSON.
+It does not import verifier internals or modify the core package.
