@@ -1,0 +1,526 @@
+{
+  "$defs": {
+    "Actor": {
+      "enum": [
+        "human",
+        "fixer",
+        "verifier",
+        "system"
+      ],
+      "title": "Actor",
+      "type": "string"
+    },
+    "FindingSource": {
+      "enum": [
+        "shadow_watch",
+        "demo",
+        "post_merge_watch"
+      ],
+      "title": "FindingSource",
+      "type": "string"
+    },
+    "FindingStatus": {
+      "enum": [
+        "open",
+        "fix_proposed",
+        "verifying",
+        "closed",
+        "fix_rejected",
+        "expired"
+      ],
+      "title": "FindingStatus",
+      "type": "string"
+    },
+    "FixAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        },
+        "changed_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Changed Paths",
+          "type": "array"
+        },
+        "diff_lines": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Diff Lines",
+          "type": "integer"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "fixer": {
+          "enum": [
+            "claude-code",
+            "api",
+            "command"
+          ],
+          "title": "Fixer",
+          "type": "string"
+        },
+        "number": {
+          "minimum": 1,
+          "title": "Number",
+          "type": "integer"
+        },
+        "outcome": {
+          "default": "running",
+          "enum": [
+            "running",
+            "dry_run",
+            "proposed",
+            "rejected",
+            "verified",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "pull_request_number": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pull Request Number"
+        },
+        "pull_request_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pull Request Url"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "fixer",
+        "branch"
+      ],
+      "title": "FixAttempt",
+      "type": "object"
+    },
+    "HistoryEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "actor": {
+          "$ref": "#/$defs/Actor"
+        },
+        "detail": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Detail",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor",
+        "action",
+        "detail"
+      ],
+      "title": "HistoryEvent",
+      "type": "object"
+    },
+    "LocalizationCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "maxLength": 64,
+          "minLength": 7,
+          "title": "Commit",
+          "type": "string"
+        },
+        "committed_at": {
+          "format": "date-time",
+          "title": "Committed At",
+          "type": "string"
+        },
+        "diff_excerpt": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Diff Excerpt",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "score": {
+          "minimum": 0,
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "path",
+        "commit",
+        "committed_at",
+        "score",
+        "reason"
+      ],
+      "title": "LocalizationCandidate",
+      "type": "object"
+    },
+    "MergeRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "maxLength": 64,
+          "minLength": 7,
+          "title": "Commit",
+          "type": "string"
+        },
+        "merged_at": {
+          "format": "date-time",
+          "title": "Merged At",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "human",
+            "automatic"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "pull_request_number": {
+          "minimum": 1,
+          "title": "Pull Request Number",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode",
+        "merged_at",
+        "commit",
+        "pull_request_number"
+      ],
+      "title": "MergeRecord",
+      "type": "object"
+    },
+    "MetricFailure": {
+      "additionalProperties": false,
+      "description": "A payload-free projection of one failed Maida aggregate result.",
+      "properties": {
+        "decision_rule": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Decision Rule",
+          "type": "string"
+        },
+        "evidence_pointer": {
+          "minLength": 1,
+          "title": "Evidence Pointer",
+          "type": "string"
+        },
+        "harmful_exceedances": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Harmful Exceedances"
+        },
+        "kind": {
+          "enum": [
+            "invariant",
+            "measured",
+            "distributional",
+            "statistical"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "metric": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Metric",
+          "type": "string"
+        },
+        "observed": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed"
+        },
+        "prediction_bound": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prediction Bound"
+        },
+        "run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Run Ids",
+          "type": "array"
+        },
+        "structural_terms": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Structural Terms",
+          "type": "array"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "verdict": {
+          "const": "fail",
+          "default": "fail",
+          "title": "Verdict",
+          "type": "string"
+        },
+        "violations": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Violations"
+        }
+      },
+      "required": [
+        "metric",
+        "kind",
+        "decision_rule",
+        "evidence_pointer"
+      ],
+      "title": "MetricFailure",
+      "type": "object"
+    }
+  },
+  "$id": "https://maida.ai/schemas/maida-heal/finding/1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempts": {
+      "items": {
+        "$ref": "#/$defs/FixAttempt"
+      },
+      "title": "Attempts",
+      "type": "array"
+    },
+    "closure_report": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Closure Report"
+    },
+    "cooldown_until": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cooldown Until"
+    },
+    "detected_at": {
+      "format": "date-time",
+      "title": "Detected At",
+      "type": "string"
+    },
+    "history": {
+      "items": {
+        "$ref": "#/$defs/HistoryEvent"
+      },
+      "minItems": 1,
+      "title": "History",
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "localization": {
+      "items": {
+        "$ref": "#/$defs/LocalizationCandidate"
+      },
+      "title": "Localization",
+      "type": "array"
+    },
+    "merge": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MergeRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "metric_failures": {
+      "items": {
+        "$ref": "#/$defs/MetricFailure"
+      },
+      "minItems": 1,
+      "title": "Metric Failures",
+      "type": "array"
+    },
+    "onset_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Onset At"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/FindingSource"
+    },
+    "status": {
+      "$ref": "#/$defs/FindingStatus",
+      "default": "open"
+    },
+    "stream": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Stream",
+      "type": "string"
+    },
+    "stream_id": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Stream Id",
+      "type": "string"
+    },
+    "summary": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 240,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "stream",
+    "stream_id",
+    "source",
+    "title",
+    "summary",
+    "metric_failures",
+    "history"
+  ],
+  "title": "Finding",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

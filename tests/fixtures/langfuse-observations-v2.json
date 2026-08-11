@@ -1,0 +1,72 @@
+{
+  "data": [
+    {
+      "id": "obs-session-1",
+      "traceId": "trace-session-1",
+      "traceName": "support-agent",
+      "sessionId": "support-session-1001",
+      "startTime": "2026-08-01T00:00:00Z",
+      "endTime": "2026-08-01T00:00:01Z",
+      "type": "GENERATION",
+      "name": "respond",
+      "metadata": {"agent_id": "ignored-by-session"},
+      "usageDetails": {"total": 21},
+      "costDetails": {"total": 0.001},
+      "input": "PII-recorded-shape-sentinel",
+      "output": "PII-recorded-shape-sentinel"
+    },
+    {
+      "id": "obs-session-2",
+      "traceId": "trace-session-2",
+      "traceName": "support-agent",
+      "sessionId": "support-session-1002",
+      "startTime": "2026-08-02T00:00:00Z",
+      "endTime": "2026-08-02T00:00:01Z",
+      "type": "GENERATION",
+      "name": "respond",
+      "metadata": {"agent_id": "ignored-by-session"},
+      "usageDetails": {"total": 22}
+    },
+    {
+      "id": "obs-metadata-1",
+      "traceId": "trace-metadata-1",
+      "traceName": "billing-a",
+      "startTime": "2026-08-03T00:00:00Z",
+      "endTime": "2026-08-03T00:00:01Z",
+      "type": "SPAN",
+      "name": "charge",
+      "metadata": {"agent_id": "billing-private-value"}
+    },
+    {
+      "id": "obs-metadata-2",
+      "traceId": "trace-metadata-2",
+      "traceName": "billing-b",
+      "startTime": "2026-08-04T00:00:00Z",
+      "endTime": "2026-08-04T00:00:01Z",
+      "type": "SPAN",
+      "name": "charge",
+      "metadata": {"agent_id": "billing-private-value"}
+    },
+    {
+      "id": "obs-name-1",
+      "traceId": "trace-name-1",
+      "traceName": "fallback-agent",
+      "startTime": "2026-08-10T00:00:00Z",
+      "endTime": "2026-08-10T00:00:01Z",
+      "type": "TOOL",
+      "name": "lookup",
+      "metadata": {}
+    },
+    {
+      "id": "obs-name-2",
+      "traceId": "trace-name-2",
+      "traceName": "fallback-agent",
+      "startTime": "2026-08-14T23:59:59Z",
+      "endTime": "2026-08-14T23:59:59.500000Z",
+      "type": "TOOL",
+      "name": "lookup",
+      "metadata": {}
+    }
+  ],
+  "meta": {}
+}

@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "ClosureCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Detail",
+          "type": "string"
+        },
+        "evidence_pointers": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Pointers",
+          "type": "array"
+        },
+        "name": {
+          "enum": [
+            "specific_metrics",
+            "holdouts",
+            "no_new_failures"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "passed",
+        "evidence_pointers",
+        "detail"
+      ],
+      "title": "ClosureCondition",
+      "type": "object"
+    }
+  },
+  "$id": "https://maida.ai/schemas/maida-heal/closure-report/1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "conditions": {
+      "items": {
+        "$ref": "#/$defs/ClosureCondition"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Conditions",
+      "type": "array"
+    },
+    "finding_id": {
+      "pattern": "^mh-[0-9]{8}-[0-9a-f]{10}$",
+      "title": "Finding Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "maida_report_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Maida Report Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "verdict": {
+      "enum": [
+        "closed",
+        "rejected"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "finding_id",
+    "maida_report_version",
+    "verdict",
+    "conditions"
+  ],
+  "title": "ClosureReport",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

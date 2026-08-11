@@ -1,0 +1,372 @@
+{
+  "$defs": {
+    "AutoMergeConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "daily_budget": {
+          "default": 3,
+          "minimum": 1,
+          "title": "Daily Budget",
+          "type": "integer"
+        },
+        "enabled_at": {
+          "format": "date-time",
+          "title": "Enabled At",
+          "type": "string"
+        },
+        "max_diff_lines": {
+          "default": 200,
+          "minimum": 1,
+          "title": "Max Diff Lines",
+          "type": "integer"
+        },
+        "recurrence_hours": {
+          "default": 48,
+          "minimum": 1,
+          "title": "Recurrence Hours",
+          "type": "integer"
+        }
+      },
+      "title": "AutoMergeConfig",
+      "type": "object"
+    },
+    "FixesConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Paths",
+          "type": "array"
+        },
+        "auto_propose": {
+          "default": false,
+          "title": "Auto Propose",
+          "type": "boolean"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "cooldown_hours": {
+          "default": 24,
+          "maximum": 720,
+          "minimum": 0,
+          "title": "Cooldown Hours",
+          "type": "integer"
+        },
+        "fixer": {
+          "enum": [
+            "claude-code",
+            "api",
+            "command"
+          ],
+          "title": "Fixer",
+          "type": "string"
+        },
+        "max_attempts_per_finding": {
+          "default": 2,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Attempts Per Finding",
+          "type": "integer"
+        },
+        "repo": {
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "repo_local_path": {
+          "minLength": 1,
+          "title": "Repo Local Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "repo_local_path",
+        "fixer"
+      ],
+      "title": "FixesConfig",
+      "type": "object"
+    },
+    "GateConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Command",
+          "type": "array"
+        },
+        "enabled_at": {
+          "format": "date-time",
+          "title": "Enabled At",
+          "type": "string"
+        },
+        "holdout_command": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Holdout Command"
+        },
+        "holdout_fraction": {
+          "default": 0.25,
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "title": "Holdout Fraction",
+          "type": "number"
+        },
+        "manifest_path": {
+          "default": ".maida/heal.yaml",
+          "title": "Manifest Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "title": "GateConfig",
+      "type": "object"
+    },
+    "LangfuseConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_source": {
+          "enum": [
+            "environment",
+            "config",
+            "prompt",
+            "fixture"
+          ],
+          "title": "Credential Source",
+          "type": "string"
+        },
+        "host": {
+          "minLength": 1,
+          "title": "Host",
+          "type": "string"
+        },
+        "metadata_keys": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Metadata Keys",
+          "type": "array"
+        },
+        "window_days": {
+          "default": 14,
+          "maximum": 90,
+          "minimum": 1,
+          "title": "Window Days",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "credential_source"
+      ],
+      "title": "LangfuseConfig",
+      "type": "object"
+    },
+    "StreamConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "grouping": {
+          "enum": [
+            "session_pattern",
+            "metadata",
+            "trace_name"
+          ],
+          "title": "Grouping",
+          "type": "string"
+        },
+        "grouping_key": {
+          "minLength": 1,
+          "title": "Grouping Key",
+          "type": "string"
+        },
+        "grouping_value_hash": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Grouping Value Hash",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "outlier": {
+          "default": false,
+          "title": "Outlier",
+          "type": "boolean"
+        },
+        "selected": {
+          "default": true,
+          "title": "Selected",
+          "type": "boolean"
+        },
+        "selectors": {
+          "items": {
+            "$ref": "#/$defs/StreamSelector"
+          },
+          "title": "Selectors",
+          "type": "array"
+        },
+        "status": {
+          "default": "watching",
+          "enum": [
+            "watching",
+            "insufficient-data",
+            "excluded"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "trace_names": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Trace Names",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "grouping",
+        "grouping_key",
+        "grouping_value_hash",
+        "trace_names"
+      ],
+      "title": "StreamConfig",
+      "type": "object"
+    },
+    "StreamSelector": {
+      "additionalProperties": false,
+      "properties": {
+        "grouping": {
+          "enum": [
+            "session_pattern",
+            "metadata",
+            "trace_name"
+          ],
+          "title": "Grouping",
+          "type": "string"
+        },
+        "grouping_key": {
+          "minLength": 1,
+          "title": "Grouping Key",
+          "type": "string"
+        },
+        "grouping_value_hash": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Grouping Value Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "grouping",
+        "grouping_key",
+        "grouping_value_hash"
+      ],
+      "title": "StreamSelector",
+      "type": "object"
+    }
+  },
+  "$id": "https://maida.ai/schemas/maida-heal/config/1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "auto_merge": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AutoMergeConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "fixes": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FixesConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "gate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GateConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "langfuse": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LangfuseConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "streams": {
+      "items": {
+        "$ref": "#/$defs/StreamConfig"
+      },
+      "title": "Streams",
+      "type": "array"
+    }
+  },
+  "title": "HealConfig",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}
