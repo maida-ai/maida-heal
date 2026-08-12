@@ -1,7 +1,19 @@
 # Headless walkthroughs
 
-Each walkthrough starts with configuration, states the unattended behavior, and names
-the event customer automation receives. Nothing reads from a TTY.
+Start with the explicit path when evaluating how the loop maps to an existing agent:
+
+- [Support-agent loop: production drift to verified handoff](support-agent-loop.md)
+- [Customer-owned handoff: authenticated event to release queue](customer-handoff.md)
+- [Recurrence response: deployment regresses again](recurrence-response.md)
+
+These walkthroughs include a readable agent loop, two prompt states, every profile's
+complete configuration, the command writer, the repository scenario command, a
+versioned event, and the receiving automation. Their executable assets live in
+[`support-agent/`](support-agent/).
+
+The compact profile walkthroughs remain useful as operator references. Each starts
+with configuration, states the unattended behavior, and names the event customer
+automation receives. Nothing reads from a TTY.
 
 - [Offline automated demo](demo.md)
 - [Shadow: detect and emit](shadow.md)

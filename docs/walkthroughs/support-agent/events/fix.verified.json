@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0.0",
+  "event_id": "evt_11111111111111111111111111111111",
+  "type": "fix.verified",
+  "occurred_at": "2026-08-11T12:30:00Z",
+  "stream_id": "support-agent-4674e386",
+  "finding_id": "mh-20260811-0123456789",
+  "data": {
+    "finding_id": "mh-20260811-0123456789",
+    "pull_request_number": 42,
+    "release_mode": "handoff",
+    "release_ready": true,
+    "closure_report": {
+      "schema_version": "1.0.0",
+      "finding_id": "mh-20260811-0123456789",
+      "generated_at": "2026-08-11T12:29:58Z",
+      "maida_report_version": "2.0.0",
+      "verdict": "closed",
+      "conditions": [
+        {
+          "name": "specific_metrics",
+          "passed": true,
+          "evidence_pointers": [
+            ".maida/heal/reports/mh-20260811-0123456789-candidate.json"
+          ],
+          "detail": "The step-count and tool-call metrics that opened the finding pass."
+        },
+        {
+          "name": "holdouts",
+          "passed": true,
+          "evidence_pointers": [
+            ".maida/heal/reports/mh-20260811-0123456789-holdout.json"
+          ],
+          "detail": "Every withheld scenario passes."
+        },
+        {
+          "name": "no_new_failures",
+          "passed": true,
+          "evidence_pointers": [
+            ".maida/heal/reports/mh-20260811-0123456789-candidate.json"
+          ],
+          "detail": "The candidate report contains no new failed aggregate."
+        }
+      ]
+    }
+  }
+}

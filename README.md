@@ -43,6 +43,16 @@ structural traces, detects a real regression, runs the `command` fix writer, ver
 the exact finding plus holdouts, shows each JSON event handoff, and finishes with a
 `fix.verified` event and PR-comment preview. It never merges or deploys.
 
+## Learn with a visible agent loop
+
+The [explicit support-agent walkthrough](docs/walkthroughs/support-agent-loop.md)
+starts from readable agent code and a concrete retry regression. It runs both prompt
+states, shows the production-import and repository-scenario boundaries, builds each
+complete profile, opens the candidate-patch path step by step, and follows
+`fix.verified` into a customer-owned, HMAC-authenticated release queue. Separate
+walkthroughs cover the [customer handoff](docs/walkthroughs/customer-handoff.md) and
+[post-release recurrence](docs/walkthroughs/recurrence-response.md).
+
 ## Bootstrap a shadow profile
 
 `up` reuses the standard `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and
