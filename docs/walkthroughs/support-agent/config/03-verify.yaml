@@ -1,0 +1,84 @@
+schema_version: 2.0.0
+mode: verify
+
+langfuse:
+  host: https://langfuse.example.com
+  credential_source: environment
+  metadata_keys: [agent_id]
+  window_days: 14
+  cursor_overlap_seconds: 300
+
+streams:
+  - id: support-agent-4674e386
+    name: Support order agent
+    grouping: metadata
+    grouping_key: agent_id
+    grouping_value_hash: 4674e386986c
+    selectors:
+      - grouping: metadata
+        grouping_key: agent_id
+        grouping_value_hash: 4674e386986c
+    trace_names: [support-agent]
+    enabled: true
+    envelope:
+      coverage: 0.99
+      confidence: 0.95
+      metrics:
+        step_count: gating
+        tool_call_count: gating
+        latency_ms: report_only
+        cost_tokens: report_only
+    outlier: false
+    status: watching
+
+fixes:
+  repo: maida-ai/support-agent-config
+  repo_local_path: /srv/support-agent-config
+  fixer: command
+  command: [python, scripts/fix_retry_budget.py]
+  auto_propose: true
+  allowed_paths: [prompts/**]
+  max_attempts_per_finding: 2
+  cooldown_hours: 24
+
+gate:
+  enabled_at: 2026-08-11T12:00:00Z
+  manifest_path: .maida/heal.yaml
+  command:
+    - python
+    - scripts/run_gate.py
+    - --suite
+    - "{suite}"
+    - --report
+    - "{report}"
+    - --baseline
+    - "{baseline}"
+    - --policy
+    - "{policy}"
+    - --holdout
+    - "{holdout}"
+    - --finding
+    - "{finding}"
+  holdout_command:
+    - python
+    - scripts/run_gate.py
+    - --suite
+    - holdout
+    - --report
+    - "{report}"
+    - --baseline
+    - "{baseline}"
+    - --policy
+    - "{policy}"
+    - --holdout
+    - "{holdout}"
+    - --finding
+    - "{finding}"
+  holdout_fraction: 0.25
+
+events:
+  sinks:
+    - kind: jsonl
+      path: .maida-heal/events.jsonl
+    - kind: github
+      enabled: true
