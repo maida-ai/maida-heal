@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from maida_heal.fixers import Fixer
-from maida_heal.gitops import commit_fix, create_worktree
-from maida_heal.healing import (
+from maida.heal.fixers import Fixer
+from maida.heal.gitops import commit_fix, create_worktree
+from maida.heal.healing import (
     Publisher,
     PullRequest,
     expire_exhausted_finding,
     propose_fix,
 )
-from maida_heal.models import (
+from maida.heal.models import (
     Actor,
     Finding,
     FindingSource,
@@ -29,7 +29,7 @@ from maida_heal.models import (
     MetricFailure,
     StreamConfig,
 )
-from maida_heal.state import StateError, StateStore
+from maida.heal.state import StateError, StateStore
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 
@@ -531,8 +531,8 @@ import signal
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from maida_heal.healing import propose_fix
-from maida_heal.state import StateStore
+from maida.heal.healing import propose_fix
+from maida.heal.state import StateStore
 state = StateStore(Path(sys.argv[1]))
 config = state.load_config()
 def checkpoint(name):

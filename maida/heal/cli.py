@@ -12,24 +12,24 @@ from typing import Annotated, NoReturn
 
 import typer
 
-from maida_heal.constants import EXIT_INTERNAL, EXIT_NOT_FOUND
-from maida_heal.core import CoreCommandError, MaidaCLI, ReportCompatibilityError
-from maida_heal.events import EventJournal
-from maida_heal.fixers import FixerError, fixer_from_config
-from maida_heal.fixtures import FixtureRun
-from maida_heal.gate import (
+from maida.heal.constants import EXIT_INTERNAL, EXIT_NOT_FOUND
+from maida.heal.core import CoreCommandError, MaidaCLI, ReportCompatibilityError
+from maida.heal.events import EventJournal
+from maida.heal.fixers import FixerError, fixer_from_config
+from maida.heal.fixtures import FixtureRun
+from maida.heal.gate import (
     GateError,
     GitHubCommenter,
     VerificationNotEnabled,
     verify_closure,
 )
-from maida_heal.gate import (
+from maida.heal.gate import (
     enable_gate as scaffold_gate,
 )
-from maida_heal.gitops import GitError
-from maida_heal.healing import PublishError, expire_exhausted_finding, propose_fix
-from maida_heal.killswitch import KillSwitchSyncError, sync_ci_kill_switch
-from maida_heal.langfuse import (
+from maida.heal.gitops import GitError
+from maida.heal.healing import PublishError, expire_exhausted_finding, propose_fix
+from maida.heal.killswitch import KillSwitchSyncError, sync_ci_kill_switch
+from maida.heal.langfuse import (
     DEFAULT_METADATA_KEYS,
     HTTPClient,
     LangfuseClient,
@@ -37,7 +37,7 @@ from maida_heal.langfuse import (
     LangfuseError,
     resolve_credentials,
 )
-from maida_heal.models import (
+from maida.heal.models import (
     EventEnvelope,
     EventType,
     JsonlSinkConfig,
@@ -46,32 +46,32 @@ from maida_heal.models import (
     StreamHealth,
     jsonable,
 )
-from maida_heal.onboarding import (
+from maida.heal.onboarding import (
     attach,
     fixture_attachment_client,
     plan_attachment,
     purge_imported_data,
     watch_once,
 )
-from maida_heal.prerequisites import (
+from maida.heal.prerequisites import (
     PrerequisiteError,
     check_fixer,
     check_gh_auth,
     materialize_config_repo,
 )
-from maida_heal.release import (
+from maida.heal.release import (
     ReleaseError,
     handle_recurrence,
     refresh_human_merges,
 )
-from maida_heal.state import (
+from maida.heal.state import (
     StateError,
     StateStore,
     clear_kill_switch,
     read_json,
     write_kill_switch,
 )
-from maida_heal.structured_log import StructuredLogger
+from maida.heal.structured_log import StructuredLogger
 
 app = typer.Typer(
     name="maida-heal",
@@ -155,7 +155,7 @@ def _now() -> datetime:
 @app.command()
 def demo() -> None:
     """Run the complete offline loop with deterministic fixtures and a command fixer."""
-    from maida_heal.demo import run_demo
+    from maida.heal.demo import run_demo
 
     started = time.perf_counter()
     try:

@@ -89,7 +89,7 @@ Run from the same control directory:
 maida-heal status --json
 ```
 
-The output validates against `schemas/status-1.0.0.schema.json`. Treat top-level
+The output validates against `maida/heal/schemas/status-1.0.0.schema.json`. Treat top-level
 `health: degraded`, any degraded stream, `paused: true`, or a rising
 `event_stream.pending` count as actionable. Error messages are structural and
 redacted; inspect local reports and structured stderr logs for the named phase.

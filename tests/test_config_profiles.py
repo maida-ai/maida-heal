@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from maida_heal.models import (
+from maida.heal.models import (
     ActivationConfig,
     AutoMergeConfig,
     EnvelopeConfig,

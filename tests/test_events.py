@@ -8,9 +8,9 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
-from maida_heal.detection import persist_failures
-from maida_heal.events import DeliveryResponse, EventJournal
-from maida_heal.models import (
+from maida.heal.detection import persist_failures
+from maida.heal.events import DeliveryResponse, EventJournal
+from maida.heal.models import (
     ClosureCondition,
     ClosureReport,
     EventConfig,
@@ -24,7 +24,7 @@ from maida_heal.models import (
     StreamConfig,
     WebhookSinkConfig,
 )
-from maida_heal.state import StateStore
+from maida.heal.state import StateStore
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 ROOT = Path(__file__).resolve().parents[1]
@@ -263,7 +263,7 @@ def test_every_published_event_type_validates_against_versioned_schema() -> None
             "branch": "maida-heal/revert-mh-20260811-0123456789",
         },
     }
-    schema = json.loads((ROOT / "schemas" / "event-1.0.0.schema.json").read_text())
+    schema = json.loads((ROOT / "maida" / "heal" / "schemas" / "event-1.0.0.schema.json").read_text())
     validator = Draft202012Validator(schema)
 
     for index, (event_type, data) in enumerate(samples.items()):
@@ -281,7 +281,7 @@ def test_every_published_event_type_validates_against_versioned_schema() -> None
 def test_published_schema_rejects_data_for_a_different_event_type() -> None:
     payload = opened_event().model_dump(mode="json")
     payload["type"] = EventType.FIX_PROPOSED.value
-    schema = json.loads((ROOT / "schemas" / "event-1.0.0.schema.json").read_text())
+    schema = json.loads((ROOT / "maida" / "heal" / "schemas" / "event-1.0.0.schema.json").read_text())
 
     errors = list(Draft202012Validator(schema).iter_errors(payload))
 

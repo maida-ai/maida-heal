@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 
-from maida_heal.constants import PROTECTED_PATH_PATTERNS
-from maida_heal.models import LocalizationCandidate
+from maida.heal.constants import PROTECTED_PATH_PATTERNS
+from maida.heal.models import LocalizationCandidate
 
 
 class GitError(RuntimeError):

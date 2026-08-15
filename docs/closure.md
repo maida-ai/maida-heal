@@ -33,7 +33,7 @@ not included in fixer prompts or normal finding display.
 ## Closure report
 
 The result is `.maida/findings/closure/<finding-id>.json`, validated against
-`schemas/closure-report-1.0.0.schema.json`. It records each condition, its Boolean
+`maida/heal/schemas/closure-report-1.0.0.schema.json`. It records each condition, its Boolean
 result, and pointers to the candidate and holdout Maida reports. It does not copy
 trace payloads.
 

@@ -7,7 +7,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel
 
-from maida_heal.models import (
+from maida.heal.models import (
     ClosureReport,
     EventEnvelope,
     Finding,
@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_shipped_schema_matches_strict_pydantic_contract(
     filename: str, model: type[BaseModel], version: str
 ) -> None:
-    payload = json.loads((ROOT / "schemas" / filename).read_text(encoding="utf-8"))
+    payload = json.loads((ROOT / "maida" / "heal" / "schemas" / filename).read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(payload)
     generated = model_schema(model)
     projected = {

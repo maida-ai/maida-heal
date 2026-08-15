@@ -7,14 +7,14 @@ from jsonschema import Draft202012Validator
 from pytest import MonkeyPatch
 from typer.testing import CliRunner
 
-from maida_heal.cli import app
-from maida_heal.models import (
+from maida.heal.cli import app
+from maida.heal.models import (
     ActivationConfig,
     FixesConfig,
     GateConfig,
     LoopMode,
 )
-from maida_heal.state import StateStore, read_json, write_json
+from maida.heal.state import StateStore, read_json, write_json
 
 FIXTURE_ENV = {
     "MAIDA_HEAL_LANGFUSE_FIXTURE": "1",
@@ -77,7 +77,7 @@ def test_status_json_is_stable_machine_health_surface(
     }
     assert payload["event_stream"]["format"] == "jsonl"
     assert payload["streams"][0]["effective_mode"] == "shadow"
-    schema = json.loads((ROOT / "schemas" / "status-1.0.0.schema.json").read_text())
+    schema = json.loads((ROOT / "maida" / "heal" / "schemas" / "status-1.0.0.schema.json").read_text())
     Draft202012Validator(schema).validate(payload)
 
 
@@ -140,8 +140,8 @@ def test_mode_transitions_change_only_the_documented_dispatch_capability(
         calls.append(finding_id)
         return SimpleNamespace(pull_request=None)
 
-    monkeypatch.setattr("maida_heal.cli.propose_fix", fake_propose)
-    monkeypatch.setattr("maida_heal.cli.refresh_human_merges", lambda *_args: [])
+    monkeypatch.setattr("maida.heal.cli.propose_fix", fake_propose)
+    monkeypatch.setattr("maida.heal.cli.refresh_human_merges", lambda *_args: [])
 
     shadow = runner.invoke(app, ["watch", "--once"], env=FIXTURE_ENV)
     assert shadow.exit_code == 0

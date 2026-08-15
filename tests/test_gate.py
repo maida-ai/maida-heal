@@ -8,16 +8,16 @@ import pytest
 from pytest import MonkeyPatch
 from typer.testing import CliRunner
 
-from maida_heal.cli import app
-from maida_heal.core import MaidaCLI, ReportCompatibilityError
-from maida_heal.gate import (
+from maida.heal.cli import app
+from maida.heal.core import MaidaCLI, ReportCompatibilityError
+from maida.heal.gate import (
     ClosureRunner,
     GateError,
     VerificationNotEnabled,
     enable_gate,
     verify_closure,
 )
-from maida_heal.models import (
+from maida.heal.models import (
     ActivationConfig,
     Actor,
     AutoMergeConfig,
@@ -28,12 +28,12 @@ from maida_heal.models import (
     LoopMode,
     WebhookSinkConfig,
 )
-from maida_heal.onboarding import (
+from maida.heal.onboarding import (
     apply_stream_edits,
     attach,
     fixture_attachment_client,
 )
-from maida_heal.state import (
+from maida.heal.state import (
     StateStore,
     load_gate_manifest,
     save_gate_manifest,
@@ -264,7 +264,7 @@ def test_full_handoff_emits_verified_event_and_never_calls_merge(
     save_gate_manifest(repo, manifest)
     merge_calls: list[bool] = []
     monkeypatch.setattr(
-        "maida_heal.release.maybe_auto_merge",
+        "maida.heal.release.maybe_auto_merge",
         lambda *_args, **_kwargs: merge_calls.append(True),
     )
 
@@ -305,7 +305,7 @@ def test_full_profile_respects_verify_only_stream_override(
     save_gate_manifest(repo, manifest)
     merge_calls: list[bool] = []
     monkeypatch.setattr(
-        "maida_heal.release.maybe_auto_merge",
+        "maida.heal.release.maybe_auto_merge",
         lambda *_args, **_kwargs: merge_calls.append(True),
     )
 

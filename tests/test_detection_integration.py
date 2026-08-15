@@ -1,17 +1,17 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from maida_heal.artifacts import prepare_stream_artifacts
-from maida_heal.core import MaidaCLI
-from maida_heal.detection import evaluate_stream
-from maida_heal.fixtures import fixture_runs, materialize_runs
-from maida_heal.models import (
+from maida.heal.artifacts import prepare_stream_artifacts
+from maida.heal.core import MaidaCLI
+from maida.heal.detection import evaluate_stream
+from maida.heal.fixtures import fixture_runs, materialize_runs
+from maida.heal.models import (
     HealConfig,
     ImportRecord,
     LangfuseConfig,
     StreamConfig,
 )
-from maida_heal.state import StateStore
+from maida.heal.state import StateStore
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 

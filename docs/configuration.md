@@ -161,6 +161,6 @@ and apply the config. Existing findings and event history are preserved. Lowerin
 from `full` stops release-ready handoffs; removing `auto_merge` restores handoff
 without disabling closure.
 
-Schema 2.0.0 is published at `schemas/config-2.0.0.schema.json`. Schema 1.0.0 remains
+Schema 2.0.0 is published at `maida/heal/schemas/config-2.0.0.schema.json`. Schema 1.0.0 remains
 published for artifact history. Non-automatic 1.0.0 files are migrated in memory;
 an old automatic-merge file is refused until the new attestation is added explicitly.

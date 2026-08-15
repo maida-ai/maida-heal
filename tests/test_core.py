@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from maida_heal.core import (
+from maida.heal.core import (
     CommandResult,
     MaidaCLI,
     ReportCompatibilityError,
     validate_report,
 )
-from maida_heal.state import StateStore
+from maida.heal.state import StateStore
 
 
 class RecordingRunner:

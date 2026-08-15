@@ -4,14 +4,14 @@ from pathlib import Path
 import pytest
 from pytest import MonkeyPatch
 
-from maida_heal.models import FixesConfig
-from maida_heal.prerequisites import (
+from maida.heal.models import FixesConfig
+from maida.heal.prerequisites import (
     PrerequisiteError,
     check_fixer,
     check_gh_auth,
     materialize_config_repo,
 )
-from maida_heal.state import StateStore
+from maida.heal.state import StateStore
 
 
 def git(repo: Path, *arguments: str) -> None:
@@ -31,7 +31,7 @@ def repository(path: Path, slug: str = "maida-ai/example") -> Path:
 def test_fixer_prerequisites_are_explicit_config_checks(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("maida_heal.prerequisites.shutil.which", lambda _name: None)
+    monkeypatch.setattr("maida.heal.prerequisites.shutil.which", lambda _name: None)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     check_fixer("command", ["fixture"])
@@ -52,7 +52,7 @@ def test_github_auth_failure_has_copyable_remediation(
     monkeypatch: MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "maida_heal.prerequisites.subprocess.run",
+        "maida.heal.prerequisites.subprocess.run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess([], 1, "", "denied"),
     )
 

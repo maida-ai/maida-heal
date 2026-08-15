@@ -11,13 +11,13 @@ import argparse
 import tempfile
 from pathlib import Path
 
-from maida_heal.core import MaidaCLI
-from maida_heal.fixtures import (
+from maida.heal.core import MaidaCLI
+from maida.heal.fixtures import (
     fixed_candidate_runs,
     fixture_runs,
     materialize_runs,
 )
-from maida_heal.state import StateStore
+from maida.heal.state import StateStore
 
 
 def apply_patch_fixture(worktree: Path) -> int:

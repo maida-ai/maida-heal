@@ -10,4 +10,4 @@ build/
 __pycache__/
 *.py[cod]
 .maida-heal/
-maida_heal/_version.py
+maida/heal/_version.py

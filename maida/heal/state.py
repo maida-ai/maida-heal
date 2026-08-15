@@ -10,8 +10,8 @@ from typing import Any
 
 import yaml
 
-from maida_heal.constants import MAIDA_DIR_NAME, STATE_DIR_NAME
-from maida_heal.models import (
+from maida.heal.constants import MAIDA_DIR_NAME, STATE_DIR_NAME
+from maida.heal.models import (
     ClosureReport,
     Finding,
     GateManifest,
@@ -284,7 +284,7 @@ class StateStore:
         write_json(path, jsonable(finding))
         # The finding is authoritative. Event projection happens only after its
         # atomic write, and watch reconciles this projection after an abrupt stop.
-        from maida_heal.events import queue_finding_events
+        from maida.heal.events import queue_finding_events
 
         queue_finding_events(self.project_root, selected.events, finding)
         return path
@@ -292,7 +292,7 @@ class StateStore:
     def reconcile_finding_events(self, config: HealConfig | None = None) -> int:
         """Recover event-outbox entries after a stop between state and projection."""
         selected = config or self.load_config(required=False)
-        from maida_heal.events import queue_finding_events
+        from maida.heal.events import queue_finding_events
 
         return sum(
             len(queue_finding_events(self.project_root, selected.events, finding))

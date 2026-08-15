@@ -16,13 +16,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from maida_heal.constants import (
+from maida.heal.constants import (
     EXIT_GATE_FAILED,
     EXIT_NOT_FOUND,
     PAYLOAD_REDACTION_KEYS,
     SUPPORTED_MAIDA_REPORT_MAJOR,
 )
-from maida_heal.state import StateStore, read_json
+from maida.heal.state import StateStore, read_json
 
 
 @dataclass(frozen=True)

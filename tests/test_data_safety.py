@@ -6,20 +6,20 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
-from maida_heal.core import MaidaCLI
-from maida_heal.discovery import discover_streams
-from maida_heal.events import DeliveryResponse, EventJournal
-from maida_heal.fixtures import fixture_observations, fixture_runs
-from maida_heal.healing import _pr_body, fixer_prompt
-from maida_heal.langfuse import HTTPClient, LangfuseCredentials, Observation
-from maida_heal.models import (
+from maida.heal.core import MaidaCLI
+from maida.heal.discovery import discover_streams
+from maida.heal.events import DeliveryResponse, EventJournal
+from maida.heal.fixtures import fixture_observations, fixture_runs
+from maida.heal.healing import _pr_body, fixer_prompt
+from maida.heal.langfuse import HTTPClient, LangfuseCredentials, Observation
+from maida.heal.models import (
     EventConfig,
     FixesConfig,
     JsonlSinkConfig,
     WebhookSinkConfig,
 )
-from maida_heal.onboarding import apply_stream_edits, attach
-from maida_heal.state import StateStore
+from maida.heal.onboarding import apply_stream_edits, attach
+from maida.heal.state import StateStore
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 SENTINEL = "PII-customer@example.test-card-4111111111111111"

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pytest import MonkeyPatch
 
-from maida_heal.models import (
+from maida.heal.models import (
     ActivationConfig,
     Actor,
     AutoMergeConfig,
@@ -26,7 +26,7 @@ from maida_heal.models import (
     MetricFailure,
     StreamConfig,
 )
-from maida_heal.release import (
+from maida.heal.release import (
     GitHubReleaser,
     MergeOutcome,
     PullRequestInspection,
@@ -35,7 +35,7 @@ from maida_heal.release import (
     handle_recurrence,
     maybe_auto_merge,
 )
-from maida_heal.state import StateError, StateStore, save_gate_manifest
+from maida.heal.state import StateError, StateStore, save_gate_manifest
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 
@@ -318,7 +318,7 @@ def test_github_daily_budget_counts_only_heal_not_revert_branches(
     def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess([], 0, payload, "")
 
-    monkeypatch.setattr("maida_heal.release.subprocess.run", fake_run)
+    monkeypatch.setattr("maida.heal.release.subprocess.run", fake_run)
 
     assert GitHubReleaser().merges_today(repo=tmp_path, day="2026-08-11") == 1
 

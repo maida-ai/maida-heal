@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from maida_heal.artifacts import TargetArtifacts
-from maida_heal.constants import DETECTION_REPORT_SCHEMA_VERSION
-from maida_heal.core import MaidaCLI
-from maida_heal.models import (
+from maida.heal.artifacts import TargetArtifacts
+from maida.heal.constants import DETECTION_REPORT_SCHEMA_VERSION
+from maida.heal.core import MaidaCLI
+from maida.heal.models import (
     Actor,
     Finding,
     FindingSource,
@@ -20,7 +20,7 @@ from maida_heal.models import (
     MetricFailure,
     StreamConfig,
 )
-from maida_heal.state import StateStore, write_json
+from maida.heal.state import StateStore, write_json
 
 
 @dataclass(frozen=True)

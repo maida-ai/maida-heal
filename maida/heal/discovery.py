@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
-from maida_heal.langfuse import Observation
+from maida.heal.langfuse import Observation
 
 
 def stable_hash(value: str, *, length: int = 12) -> str:

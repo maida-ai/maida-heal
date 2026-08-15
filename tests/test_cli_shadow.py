@@ -7,9 +7,9 @@ from types import SimpleNamespace
 from pytest import MonkeyPatch
 from typer.testing import CliRunner, Result
 
-from maida_heal.cli import app
-from maida_heal.models import FixesConfig, LoopMode
-from maida_heal.state import StateStore
+from maida.heal.cli import app
+from maida.heal.models import FixesConfig, LoopMode
+from maida.heal.state import StateStore
 
 runner = CliRunner()
 FIXTURE_ENV = {
@@ -111,7 +111,7 @@ def test_interval_watch_stays_idle_while_manual_kill_switch_is_active(
         assert seconds == 1
         raise StopLoop
 
-    monkeypatch.setattr("maida_heal.cli.time.sleep", stop_after_interval)
+    monkeypatch.setattr("maida.heal.cli.time.sleep", stop_after_interval)
     result = runner.invoke(app, ["watch", "--interval", "1"], env=FIXTURE_ENV)
 
     assert isinstance(result.exception, StopLoop)
@@ -148,7 +148,7 @@ def test_watch_dispatches_new_findings_only_when_auto_propose_is_enabled(
         dispatched.append(finding_id)
         return SimpleNamespace(pull_request=None)
 
-    monkeypatch.setattr("maida_heal.cli.propose_fix", fake_propose)
+    monkeypatch.setattr("maida.heal.cli.propose_fix", fake_propose)
     result = runner.invoke(app, ["watch", "--once"], env=FIXTURE_ENV)
 
     assert result.exit_code == 0, result.output

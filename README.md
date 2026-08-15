@@ -181,7 +181,7 @@ failure, `2` missing/invalid input, and `10` internal failure.
 - [Data handling and retention](docs/data-handling.md)
 - [Architecture](docs/architecture.md)
 - [Headless walkthroughs](docs/walkthroughs/README.md)
-- [Versioned schemas](schemas/README.md)
+- [Versioned schemas](maida/heal/schemas/README.md)
 
 ## Development
 

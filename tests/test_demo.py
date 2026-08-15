@@ -4,7 +4,7 @@ import time
 from pytest import MonkeyPatch
 from typer.testing import CliRunner
 
-from maida_heal.cli import app
+from maida.heal.cli import app
 
 
 def test_demo_closes_the_real_loop_offline_under_sixty_seconds(

@@ -8,7 +8,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal, Protocol
 
-from maida_heal.models import HealConfig
+from maida.heal.models import HealConfig
 
 
 class KillSwitchSyncError(RuntimeError):

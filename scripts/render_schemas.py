@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from maida_heal.models import (
+from maida.heal.models import (
     EVENT_DATA_MODELS,
     ClosureReport,
     EventEnvelope,
@@ -57,7 +57,7 @@ def render(filename: str, model: type[BaseModel], version: str) -> None:
         "x-schema-version": version,
         **model_schema(model),
     }
-    (ROOT / "schemas" / filename).write_text(
+    (ROOT / "maida" / "heal" / "schemas" / filename).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )

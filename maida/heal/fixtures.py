@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from maida_heal.langfuse import Observation
+from maida.heal.langfuse import Observation
 
 
 @dataclass(frozen=True)

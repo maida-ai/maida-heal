@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from maida_heal.killswitch import (
+from maida.heal.killswitch import (
     KillSwitchSyncError,
     sync_ci_kill_switch,
     sync_ci_pause_scope,
 )
-from maida_heal.models import FixesConfig, GateConfig, HealConfig, LangfuseConfig
-from maida_heal.state import (
+from maida.heal.models import FixesConfig, GateConfig, HealConfig, LangfuseConfig
+from maida.heal.state import (
     StateStore,
     clear_kill_switch,
     write_kill_switch,

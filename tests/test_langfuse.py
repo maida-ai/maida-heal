@@ -8,9 +8,9 @@ from typing import cast
 import pytest
 from pytest import MonkeyPatch
 
-from maida_heal.cli import _resolve_and_bridge_credentials
-from maida_heal.discovery import discover_streams
-from maida_heal.langfuse import (
+from maida.heal.cli import _resolve_and_bridge_credentials
+from maida.heal.discovery import discover_streams
+from maida.heal.langfuse import (
     HTTPClient,
     LangfuseCredentials,
     LangfuseError,
@@ -64,7 +64,7 @@ def test_recorded_v2_shape_uses_absolute_window_and_groups_mixed_streams() -> No
 def test_credentials_prefer_environment_then_safe_local_config(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("maida_heal.langfuse.Path.home", lambda: tmp_path / "home")
+    monkeypatch.setattr("maida.heal.langfuse.Path.home", lambda: tmp_path / "home")
     environment = {
         "LANGFUSE_PUBLIC_KEY": "pk-env",
         "LANGFUSE_SECRET_KEY": "sk-env",
@@ -91,7 +91,7 @@ def test_credentials_prefer_environment_then_safe_local_config(
 def test_missing_credentials_and_invalid_windows_fail_cleanly(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("maida_heal.langfuse.Path.home", lambda: tmp_path / "home")
+    monkeypatch.setattr("maida.heal.langfuse.Path.home", lambda: tmp_path / "home")
     with pytest.raises(LangfuseError, match="Project settings"):
         resolve_credentials(tmp_path, environ={})
     client = RecordedClient()
@@ -110,7 +110,7 @@ def test_missing_credentials_and_invalid_windows_fail_cleanly(
 def test_file_credentials_are_bridged_only_to_the_import_child_environment(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("maida_heal.langfuse.Path.home", lambda: tmp_path / "home")
+    monkeypatch.setattr("maida.heal.langfuse.Path.home", lambda: tmp_path / "home")
     for key in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_HOST"):
         monkeypatch.delenv(key, raising=False)
     (tmp_path / ".env").write_text(

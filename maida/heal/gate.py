@@ -14,11 +14,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Protocol
 
-from maida_heal.artifacts import MIN_DISTRIBUTIONAL_SAMPLE, rebuild_window, safe_name
-from maida_heal.core import MaidaCLI, validate_report
-from maida_heal.events import EventJournal
-from maida_heal.killswitch import lock_blocks
-from maida_heal.models import (
+from maida.heal.artifacts import MIN_DISTRIBUTIONAL_SAMPLE, rebuild_window, safe_name
+from maida.heal.core import MaidaCLI, validate_report
+from maida.heal.events import EventJournal
+from maida.heal.killswitch import lock_blocks
+from maida.heal.models import (
     Actor,
     ClosureCondition,
     ClosureReport,
@@ -35,7 +35,7 @@ from maida_heal.models import (
     WebhookSinkConfig,
     jsonable,
 )
-from maida_heal.state import (
+from maida.heal.state import (
     StateError,
     StateStore,
     load_gate_manifest,
@@ -602,7 +602,7 @@ def _recover_persisted_closure(
         and manifest.auto_merge is not None
         and finding.merge is None
     ):
-        from maida_heal.release import maybe_auto_merge
+        from maida.heal.release import maybe_auto_merge
 
         decision = maybe_auto_merge(repo, finding, manifest.auto_merge, now=now)
         if decision.merged:
@@ -772,7 +772,7 @@ def verify_closure(
         if pr is not None:
             commenter.comment(pr, closure_markdown(report), repo=repo)
     if closed and stream_mode is LoopMode.FULL and manifest.auto_merge is not None:
-        from maida_heal.release import maybe_auto_merge
+        from maida.heal.release import maybe_auto_merge
 
         decision = maybe_auto_merge(repo, finding, manifest.auto_merge, now=now)
         if decision.merged:

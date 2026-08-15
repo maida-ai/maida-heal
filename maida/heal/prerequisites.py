@@ -8,9 +8,9 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from maida_heal.gitops import GitError, git_root, github_slug
-from maida_heal.models import FixesConfig
-from maida_heal.state import StateStore
+from maida.heal.gitops import GitError, git_root, github_slug
+from maida.heal.models import FixesConfig
+from maida.heal.state import StateStore
 
 
 class PrerequisiteError(ValueError):

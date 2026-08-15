@@ -8,17 +8,17 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from maida_heal.core import MaidaCLI
-from maida_heal.events import EventJournal
-from maida_heal.fixtures import FixtureRun
-from maida_heal.models import StreamConfig
-from maida_heal.onboarding import (
+from maida.heal.core import MaidaCLI
+from maida.heal.events import EventJournal
+from maida.heal.fixtures import FixtureRun
+from maida.heal.models import StreamConfig
+from maida.heal.onboarding import (
     apply_stream_edits,
     attach,
     fixture_attachment_client,
     watch_once,
 )
-from maida_heal.state import StateStore
+from maida.heal.state import StateStore
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 
@@ -60,7 +60,7 @@ def test_stream_comparison_failure_is_isolated_and_persisted(
     index.stream_cursors[second.id] = NOW - timedelta(days=14)
     state.save_imports(index)
 
-    from maida_heal import onboarding
+    from maida.heal import onboarding
 
     real_evaluate = onboarding.evaluate_stream
 
@@ -108,7 +108,7 @@ def test_stream_import_failure_does_not_stop_other_streams(
     config.streams.append(second)
     state.save_config(config)
 
-    from maida_heal import onboarding
+    from maida.heal import onboarding
 
     real_builder = onboarding.build_import_records
 
@@ -161,9 +161,9 @@ import signal
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from maida_heal.core import MaidaCLI
-from maida_heal.onboarding import fixture_attachment_client, watch_once
-from maida_heal.state import StateStore
+from maida.heal.core import MaidaCLI
+from maida.heal.onboarding import fixture_attachment_client, watch_once
+from maida.heal.state import StateStore
 root = Path(sys.argv[1])
 state = StateStore(root)
 batch, client = fixture_attachment_client()

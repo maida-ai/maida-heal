@@ -19,7 +19,7 @@ from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from maida_heal.models import (
+from maida.heal.models import (
     EventConfig,
     EventEnvelope,
     EventType,
@@ -29,7 +29,7 @@ from maida_heal.models import (
     WebhookSinkConfig,
     jsonable,
 )
-from maida_heal.state import read_json, write_json
+from maida.heal.state import read_json, write_json
 
 
 @dataclass(frozen=True)
@@ -99,7 +99,7 @@ class EventJournal:
         self.sleep = sleep
         self.log: Log
         if log is None:
-            from maida_heal.structured_log import StructuredLogger
+            from maida.heal.structured_log import StructuredLogger
 
             self.log = StructuredLogger().event_delivery
         else:

@@ -1,7 +1,7 @@
 # Event contract
 
 Events are the machine API between Maida-heal and customer automation. Every event is
-a strict JSON object validated by `schemas/event-1.0.0.schema.json`. Unknown envelope
+a strict JSON object validated by `maida/heal/schemas/event-1.0.0.schema.json`. Unknown envelope
 or data fields are rejected.
 
 ## Envelope

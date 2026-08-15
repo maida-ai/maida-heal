@@ -14,8 +14,8 @@ from typing import Protocol, runtime_checkable
 
 import yaml
 
-from maida_heal.fixers import Fixer, fixer_from_config
-from maida_heal.gitops import (
+from maida.heal.fixers import Fixer, fixer_from_config
+from maida.heal.gitops import (
     DiffInspection,
     GitError,
     Worktree,
@@ -29,8 +29,8 @@ from maida_heal.gitops import (
     validate_changed_paths,
     writable_symlinks,
 )
-from maida_heal.killswitch import lock_blocks
-from maida_heal.models import (
+from maida.heal.killswitch import lock_blocks
+from maida.heal.models import (
     Actor,
     Finding,
     FindingStatus,
@@ -39,7 +39,7 @@ from maida_heal.models import (
     LoopMode,
     jsonable,
 )
-from maida_heal.state import StateError, StateStore
+from maida.heal.state import StateError, StateStore
 
 
 class PublishError(RuntimeError):

@@ -7,15 +7,15 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from maida_heal.artifacts import (
+from maida.heal.artifacts import (
     TargetArtifacts,
     prepare_stream_artifacts,
     rebuild_window,
     safe_name,
 )
-from maida_heal.core import MaidaCLI
-from maida_heal.detection import DetectionResult, evaluate_stream
-from maida_heal.discovery import (
+from maida.heal.core import MaidaCLI
+from maida.heal.detection import DetectionResult, evaluate_stream
+from maida.heal.discovery import (
     StreamCandidate,
     TraceSummary,
     discover_streams,
@@ -23,9 +23,9 @@ from maida_heal.discovery import (
     stable_hash,
     summarize_traces,
 )
-from maida_heal.fixtures import FixtureRun, fixture_runs, materialize_runs
-from maida_heal.langfuse import FixtureClient, LangfuseClient, Observation
-from maida_heal.models import (
+from maida.heal.fixtures import FixtureRun, fixture_runs, materialize_runs
+from maida.heal.langfuse import FixtureClient, LangfuseClient, Observation
+from maida.heal.models import (
     HealConfig,
     ImportIndex,
     ImportRecord,
@@ -36,7 +36,7 @@ from maida_heal.models import (
     StreamHealth,
     StreamSelector,
 )
-from maida_heal.state import StateStore, read_json
+from maida.heal.state import StateStore, read_json
 
 Progress = Callable[[str], None]
 
@@ -612,6 +612,6 @@ def purge_imported_data(state: StateStore) -> int:
 
 def fixture_attachment_client() -> tuple[list[FixtureRun], FixtureClient]:
     batch = fixture_runs(regression=True)
-    from maida_heal.fixtures import fixture_observations
+    from maida.heal.fixtures import fixture_observations
 
     return batch, FixtureClient(fixture_observations(batch))

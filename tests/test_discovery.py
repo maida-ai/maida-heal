@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
-from maida_heal.discovery import discover_streams
-from maida_heal.langfuse import Observation
-from maida_heal.onboarding import apply_stream_edits, candidate_to_config
+from maida.heal.discovery import discover_streams
+from maida.heal.langfuse import Observation
+from maida.heal.onboarding import apply_stream_edits, candidate_to_config
 
 START = datetime(2026, 8, 1, tzinfo=timezone.utc)
 

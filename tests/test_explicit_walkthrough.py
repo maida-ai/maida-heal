@@ -13,11 +13,11 @@ from pathlib import Path
 
 import yaml
 
-from maida_heal.core import MaidaCLI
-from maida_heal.gate import enable_gate
-from maida_heal.models import EventEnvelope, FixesConfig, HealConfig, LoopMode
-from maida_heal.onboarding import apply_stream_edits, attach, fixture_attachment_client
-from maida_heal.state import StateStore
+from maida.heal.core import MaidaCLI
+from maida.heal.gate import enable_gate
+from maida.heal.models import EventEnvelope, FixesConfig, HealConfig, LoopMode
+from maida.heal.onboarding import apply_stream_edits, attach, fixture_attachment_client
+from maida.heal.state import StateStore
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "docs" / "walkthroughs" / "support-agent"

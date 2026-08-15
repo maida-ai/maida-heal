@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from maida_heal.constants import (
+from maida.heal.constants import (
     DEFAULT_ALLOWED_PATH_PATTERNS,
     DEFAULT_COOLDOWN_HOURS,
     DEFAULT_DAILY_MERGE_BUDGET,

@@ -10,24 +10,24 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from maida_heal.core import MaidaCLI
-from maida_heal.events import EventJournal
-from maida_heal.gate import closure_markdown, enable_gate, verify_closure
-from maida_heal.gitops import Worktree
-from maida_heal.healing import Publisher, PullRequest, propose_fix
-from maida_heal.models import (
+from maida.heal.core import MaidaCLI
+from maida.heal.events import EventJournal
+from maida.heal.gate import closure_markdown, enable_gate, verify_closure
+from maida.heal.gitops import Worktree
+from maida.heal.healing import Publisher, PullRequest, propose_fix
+from maida.heal.models import (
     ActivationConfig,
     ClosureReport,
     FixesConfig,
     JsonlSinkConfig,
     LoopMode,
 )
-from maida_heal.onboarding import (
+from maida.heal.onboarding import (
     apply_stream_edits,
     attach,
     fixture_attachment_client,
 )
-from maida_heal.state import StateStore
+from maida.heal.state import StateStore
 
 DEMO_NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 
@@ -87,7 +87,7 @@ def _gate_command() -> list[str]:
     return [
         sys.executable,
         "-m",
-        "maida_heal.demo_support",
+        "maida.heal.demo_support",
         "gate",
         "--report",
         "{report}",
@@ -142,7 +142,7 @@ def run_demo() -> DemoResult:
             repo="local/demo",
             repo_local_path=str(repo),
             fixer="command",
-            command=[sys.executable, "-m", "maida_heal.demo_support", "patch"],
+            command=[sys.executable, "-m", "maida.heal.demo_support", "patch"],
             cooldown_hours=0,
         )
         state.save_config(config)

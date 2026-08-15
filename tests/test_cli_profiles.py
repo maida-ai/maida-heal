@@ -8,15 +8,16 @@ from pathlib import Path
 from pytest import MonkeyPatch
 from typer.testing import CliRunner
 
-from maida_heal.cli import app
-from maida_heal.models import (
+from maida import heal
+from maida.heal.cli import app
+from maida.heal.models import (
     ActivationConfig,
     AutoMergeConfig,
     FixesConfig,
     GateConfig,
     LoopMode,
 )
-from maida_heal.state import StateStore, load_gate_manifest
+from maida.heal.state import StateStore, load_gate_manifest
 
 FIXTURE_ENV = {
     "MAIDA_HEAL_LANGFUSE_FIXTURE": "1",
@@ -48,7 +49,7 @@ def test_config_apply_scaffolds_verify_then_syncs_full_release_profile(
     attached = runner.invoke(app, ["up"], env=FIXTURE_ENV)
     assert attached.exit_code == 0, attached.output
     repo = config_repo(tmp_path / "repo")
-    monkeypatch.setattr("maida_heal.cli.check_gh_auth", lambda: None)
+    monkeypatch.setattr("maida.heal.cli.check_gh_auth", lambda: None)
     state = StateStore(tmp_path)
     config = state.load_config()
     config.fixes = FixesConfig(

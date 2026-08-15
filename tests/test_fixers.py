@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from pytest import MonkeyPatch
 
-from maida_heal.fixers import (
+from maida.heal.fixers import (
     AnthropicAPIFixer,
     ClaudeCodeFixer,
     CommandFixer,
@@ -61,7 +61,7 @@ def test_claude_code_fixer_uses_verified_headless_edit_only_flags(
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "", "")
 
-    monkeypatch.setattr("maida_heal.fixers.subprocess.run", fake_run)
+    monkeypatch.setattr("maida.heal.fixers.subprocess.run", fake_run)
     ClaudeCodeFixer("claude-test").write(
         tmp_path, "fix only this", environment={"PATH": "/bin"}
     )
@@ -104,7 +104,7 @@ index 4a2f01e..f2c82de 100644
 +after
 """
     monkeypatch.setattr(
-        "maida_heal.fixers.urlopen",
+        "maida.heal.fixers.urlopen",
         lambda *_args, **_kwargs: Response(
             {"content": [{"type": "text", "text": diff}]}
         ),

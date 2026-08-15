@@ -11,8 +11,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     PATH="/opt/maida-heal/.venv/bin:${PATH}"
 
 COPY pyproject.toml uv.lock README.md LICENSE ./
-COPY maida_heal ./maida_heal
-COPY schemas ./schemas
+COPY maida ./maida
 RUN uv sync --frozen --no-dev
 
 WORKDIR /work

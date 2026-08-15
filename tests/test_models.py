@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from maida_heal.models import (
+from maida.heal.models import (
     Actor,
     Finding,
     FindingSource,
@@ -15,7 +15,7 @@ from maida_heal.models import (
     LoopMode,
     MetricFailure,
 )
-from maida_heal.state import StateError, StateStore
+from maida.heal.state import StateError, StateStore
 
 NOW = datetime(2026, 8, 11, tzinfo=timezone.utc)
 

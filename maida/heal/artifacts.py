@@ -14,9 +14,9 @@ from typing import Any
 
 import yaml
 
-from maida_heal.core import MaidaCLI
-from maida_heal.models import ImportRecord, StreamConfig
-from maida_heal.state import StateStore, write_json
+from maida.heal.core import MaidaCLI
+from maida.heal.models import ImportRecord, StreamConfig
+from maida.heal.state import StateStore, write_json
 
 # Maida 0.5.0's public loader currently reports n_min=10 for coverage 0.90.
 # Keep the orchestration aligned with the released verifier's accepted contract.

@@ -2,15 +2,15 @@ import stat
 from datetime import datetime, timezone
 from pathlib import Path
 
-from maida_heal.core import MaidaCLI
-from maida_heal.onboarding import (
+from maida.heal.core import MaidaCLI
+from maida.heal.onboarding import (
     apply_stream_edits,
     attach,
     fixture_attachment_client,
     purge_imported_data,
     watch_once,
 )
-from maida_heal.state import StateStore
+from maida.heal.state import StateStore
 
 NOW = datetime(2026, 8, 11, 12, tzinfo=timezone.utc)
 

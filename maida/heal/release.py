@@ -12,9 +12,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Protocol
 
-from maida_heal.gitops import GitError, Worktree, create_worktree, resume_worktree
-from maida_heal.killswitch import lock_blocks, sync_ci_pause_scope
-from maida_heal.models import (
+from maida.heal.gitops import GitError, Worktree, create_worktree, resume_worktree
+from maida.heal.killswitch import lock_blocks, sync_ci_pause_scope
+from maida.heal.models import (
     AutoMergeConfig,
     EventEnvelope,
     EventType,
@@ -26,7 +26,7 @@ from maida_heal.models import (
     LoopMode,
     MergeRecord,
 )
-from maida_heal.state import (
+from maida.heal.state import (
     StateError,
     StateStore,
     load_gate_manifest,
@@ -555,7 +555,7 @@ def _emit_rollback_event(
     url: str,
     branch: str,
 ) -> str:
-    from maida_heal.events import EventJournal
+    from maida.heal.events import EventJournal
 
     event = EventEnvelope.create(
         event_type=EventType.ROLLBACK_OPENED,
@@ -584,7 +584,7 @@ def _emit_recurrence_pause_event(
     *,
     now: datetime,
 ) -> str:
-    from maida_heal.events import EventJournal
+    from maida.heal.events import EventJournal
 
     event = EventEnvelope.create(
         event_type=EventType.LOOP_PAUSED,
