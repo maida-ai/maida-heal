@@ -3,7 +3,7 @@
 ## Start with the released Maida gate
 
 ```bash
-uv tool install "maida-ai==0.5.3"
+uv tool install "maida-ai==0.6.0"
 maida demo --regression
 ```
 
@@ -39,6 +39,10 @@ Langfuse traces --read only--> Maida catch --> finding.opened
 
 Maida stops at the marked handoff by default. It does not sit in the customer's
 deployment path.
+
+## Versioning
+
+This experimental package uses the Maida engine's tested `MAJOR.MINOR` compatibility line and its own `PATCH` number. Immutable full `vMAJOR.MINOR.PATCH` Git tags supply its Python package version through `uv-dynamic-versioning`; do not edit the generated version by hand. State and test supported core versions before adopting a new engine line, and document incompatible changes during `0.x`. See the [Maida versioning policy](https://github.com/maida-ai/maida/blob/main/CONTRIBUTING.md#versioning-and-compatibility).
 
 ## Run the automated story offline
 
@@ -203,6 +207,4 @@ uv run ruff format --check .
 uv run mypy .
 ```
 
-The dependency on `maida-ai==0.5.0` is exact. `maida-heal` consumes only public
-commands, documented exit codes, public local-run commands, and semver'd report JSON.
-It does not import verifier internals or modify the core package.
+The verifier requirement recorded in generated gate manifests is `maida-ai==0.6.0`. `maida-heal` consumes only public commands, documented exit codes, public local-run commands, and semver'd report JSON. It does not import verifier internals or modify the core package.

@@ -1,6 +1,6 @@
 """Public CLI boundary to the pinned Maida verifier.
 
-No verifier code is imported. Every verdict is produced by `maida` 0.5.0 and
+No verifier code is imported. Every verdict is produced by `maida` 0.6.0 and
 consumed through its documented exit codes and report schema 2.x.
 """
 
