@@ -18,7 +18,7 @@ from maida.heal.core import MaidaCLI
 from maida.heal.models import ImportRecord, StreamConfig
 from maida.heal.state import StateStore, write_json
 
-# Maida 0.5.0's public loader currently reports n_min=10 for coverage 0.90.
+# Maida 0.6.0's public loader reports n_min=10 for coverage 0.90.
 # Keep the orchestration aligned with the released verifier's accepted contract.
 MIN_DISTRIBUTIONAL_SAMPLE = 10
 

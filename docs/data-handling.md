@@ -8,12 +8,7 @@ Credentials are never written to `.maida-heal/config.yaml`.
 
 ## Full trace import
 
-The pinned `maida-ai==0.5.0` importer currently requests Langfuse's `io` field while
-normalizing a complete trace. `maida-heal` runs it with Maida redaction enabled, an
-explicit sensitive-key list, and a small field-size limit. This is stricter storage
-than a default Maida import, but it is not metadata-only retrieval. A future pinned
-Maida release needs a public structural-only import option before this experiment
-can avoid fetching those fields entirely.
+The pinned `maida-ai==0.6.0` importer currently requests Langfuse's `io` field while normalizing a complete trace. `maida-heal` runs it with Maida redaction enabled, an explicit sensitive-key list, and a small field-size limit. This is stricter storage than a default Maida import, but it is not metadata-only retrieval. A future pinned Maida release needs a public structural-only import option before this experiment can avoid fetching those fields entirely.
 
 Imported native runs live under `.maida-heal/imported/maida/runs/`. Derived hard-link
 windows live under `.maida-heal/windows/`; they do not duplicate file contents.

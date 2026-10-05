@@ -9,6 +9,7 @@ from maida.heal.models import (
     Finding,
     FindingSource,
     FindingStatus,
+    GateManifest,
     HealConfig,
     HistoryEvent,
     LangfuseConfig,
@@ -18,6 +19,19 @@ from maida.heal.models import (
 from maida.heal.state import StateError, StateStore
 
 NOW = datetime(2026, 8, 11, tzinfo=timezone.utc)
+
+
+def test_gate_manifest_uses_current_verifier_and_reads_prior_artifacts() -> None:
+    current = GateManifest(command=["maida", "run"], holdout_fraction=0.2)
+    assert current.maida_requirement == "maida-ai==0.6.0"
+
+    prior = current.model_dump()
+    prior["maida_requirement"] = "maida-ai==0.5.0"
+    assert GateManifest.model_validate(prior).maida_requirement == "maida-ai==0.5.0"
+
+    prior["maida_requirement"] = "maida-ai==0.4.0"
+    with pytest.raises(ValidationError, match="maida_requirement"):
+        GateManifest.model_validate(prior)
 
 
 def finding() -> Finding:

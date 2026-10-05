@@ -785,7 +785,7 @@ class GateManifest(StrictModel):
     schema_version: Literal["2.0.0"] = "2.0.0"
     finding_schema_version: Literal["1.0.0"] = "1.0.0"
     closure_schema_version: Literal["1.0.0"] = "1.0.0"
-    maida_requirement: Literal["maida-ai==0.5.0"] = "maida-ai==0.5.0"
+    maida_requirement: Literal["maida-ai==0.5.0", "maida-ai==0.6.0"] = "maida-ai==0.6.0"
     mode: LoopMode = LoopMode.VERIFY
     stream_modes: dict[str, LoopMode] = Field(default_factory=dict)
     command: list[str] = Field(min_length=1)
